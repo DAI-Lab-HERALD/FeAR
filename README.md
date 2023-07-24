@@ -35,3 +35,17 @@
   - In '**Sequential View**' instances are sorted by temporal order. 
     - To see how situations evolve over time, and
     - To inspect every single instance irrespective of the FeAR values.
+
+## Authors
+
+    Ashwin George - PhD student @ TU Delft
+
+## Funding and support
+
+    TU Delft
+
+## Copyright notice:
+
+Technische Universiteit Delft hereby disclaims all copyright interest in the program “FeAR” (Feasible Action-Space Reduction) written by Ashwin George. Fred van Keulen, Dean of Mechanical, Maritime and Materials Engineering
+
+© 2023, Ashwin George, HERALD Lab, TU Delft
