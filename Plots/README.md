@@ -1,0 +1,1 @@
+Folder where the generated plots will be saved.
