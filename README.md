@@ -38,11 +38,11 @@
 
 ## Authors
 
-    Ashwin George - PhD student @ TU Delft
+- Ashwin George - PhD student @ TU Delft
 
 ## Funding and support
 
-    TU Delft
+- TU Delft
 
 ## Copyright notice:
 
