@@ -51,6 +51,10 @@
 
 - TU Delft
 
+## Reference
+- George, A., Siebert, L. C., Abbink, D., & Zgonnikov, A. (2023). Measuring Causal Responsibility in Multi-Agent Spatial Interactions with Feasible Action-Space Reduction. ECAI-23, accepted, https://arxiv.org/abs/2305.15003
+
+
 ## Copyright notice:
 
 Technische Universiteit Delft hereby disclaims all copyright interest in the program “FeAR” (Feasible Action-Space Reduction) written by Ashwin George. Fred van Keulen, Dean of Mechanical, Maritime and Materials Engineering
