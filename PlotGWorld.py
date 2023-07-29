@@ -31,17 +31,19 @@ MOVE_ARROW_WIDTH = 0.05
 AGENT_BOX_OFFSET = 0.15
 
 # PRINT_MATRIX_SIZE = [9, 3]
-# PRINT_MATRIX_SIZE = [1.5, 1.5] # OG
-# PRINT_MATRIX_SIZE = [3, 3] # Finer
-PRINT_MATRIX_SIZE = [2, 2]  # Finer Final
+PRINT_MATRIX_SIZE = [1.5, 1.5] # OG
+PRINT_MATRIX_SIZE_FINER = [2, 2]  # Finer
+
+PRINT_GWORLD_SIZE = [8, 4]
+GWORLD_FONT_SIZE = 16
 
 PRINT_VALIDMOVES_SIZE = [3, 2]
-PRINT_DPI = 400
+PRINT_DPI = 800
 
 FIG_SIZE = [9, 5]
 FIG_DPI = 200
 
-DECIMALS_FMT = '.2f'
+DECIMALS_FMT = '.1f'
 
 # plt.rcParams['figure.figsize'] = [8, 5];
 plt.rcParams['figure.figsize'] = FIG_SIZE
@@ -130,7 +132,7 @@ class PlotGWorld:
                     ax = plot_rect_on_matrix(yy, xx, ax=ax, offset=-AGENT_BOX_OFFSET,
                                              linewidth=max(20 // axis_length_max, 1),
                                              color=agent_colours[agentIdxxyy], fill=True, zorder=5)
-                    ax.text(yy + 0.5, xx + 0.5, str(agentIdxxyy + 1), zorder=6,
+                    ax.text(yy + 0.5, xx + 0.5, str(agentIdxxyy + 1), zorder=6, size=GWORLD_FONT_SIZE,
                             horizontalalignment='center', verticalalignment='center_baseline')
 
         MaxSteps = World.MaxSteps
@@ -245,6 +247,8 @@ class PlotGWorld:
         fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         if saveFolder is not None:
+
+            fig.set_size_inches(PRINT_GWORLD_SIZE[0], PRINT_GWORLD_SIZE[1])
             fig.set_dpi(PRINT_DPI)
             plt.title('')
 
@@ -290,8 +294,8 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 
 
 def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, title='Responsibility',
-                       plot_feal_separately=False, saveFolder=None, imageName='FeAR_',
-                       overwrite_image=False, for_print=False):
+                       plot_feal_separately=False, saveFolder=None, imageName='FeAR_', fmt=DECIMALS_FMT,
+                       overwrite_image=False, for_print=False, finer=False):
     maskDiag, ticklabels = get_mask_n_ticks(Resp)
     xlabel = 'Actor'
     ylabel = 'Affected'
@@ -303,10 +307,10 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, t
         fig, fear_axs = plt.subplots(1, 2, sharey=True, gridspec_kw={'width_ratios': [len(FeAL) + 1, 1]})
 
         fear_axs[0] = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title='FeAR', xticklabels=ticklabels,
-                                 yticklabels=ticklabels, for_print=for_print,
+                                 yticklabels=ticklabels, for_print=for_print, fmt=fmt,
                                  mask=maskDiag, ax=fear_axs[0], annot_font_size=annot_font_size, cbar=cbar)
         fear_axs[1] = plotMatrix(np.array([FeAL]), xlabel=None, ylabel=ylabel, title='FeAL',
-                                 yticklabels=ticklabels, for_print=for_print,
+                                 yticklabels=ticklabels, for_print=for_print, fmt=fmt,
                                  ax=fear_axs[1], annot_font_size=annot_font_size, cbar=False)
 
         fig.suptitle(title)
@@ -315,7 +319,7 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, t
     else:
 
         ax = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title=title, xticklabels=ticklabels,
-                        yticklabels=ticklabels, for_print=for_print,
+                        yticklabels=ticklabels, for_print=for_print, fmt=fmt,
                         mask=maskDiag, ax=ax, annot_font_size=annot_font_size, cbar=cbar);
 
         if FeAL is not None:
@@ -325,7 +329,7 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, t
                 FeAL_matrix[xx][xx] = FeAL[xx]
 
             mask_feal = np.where(maskDiag == 0, 1, 0)
-            ax = plotMatrix(FeAL_matrix, mask=mask_feal, xlabel=xlabel, ylabel=ylabel, title=title, vmin=0,
+            ax = plotMatrix(FeAL_matrix, mask=mask_feal, xlabel=xlabel, ylabel=ylabel, title=title, vmin=0, fmt=fmt,
                             xticklabels=ticklabels, yticklabels=ticklabels, ax=ax, annot_font_size=annot_font_size,
                             cbar=False, for_print=for_print);
 
@@ -334,7 +338,10 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, t
 
     if for_print:
         fig = plt.gcf()
-        fig.set_size_inches(PRINT_MATRIX_SIZE[0], PRINT_MATRIX_SIZE[1])
+        if finer:
+            fig.set_size_inches(PRINT_MATRIX_SIZE_FINER[0], PRINT_MATRIX_SIZE_FINER[1])
+        else:
+            fig.set_size_inches(PRINT_MATRIX_SIZE[0], PRINT_MATRIX_SIZE[1])
         fig.set_dpi(PRINT_DPI)
 
         save_plot(imageName, overwrite_image, saveFolder)
@@ -391,7 +398,7 @@ def get_mask_n_ticks(Matrix, ExcludeDiag=True):
 
 def plotCounts(Counts, ax=None, title=None, vmin=None, vmax=None, cmap=CMAP_VALIDMOVES,
                annot_font_size=8, center=0, saveFolder=None, imageName='PlotCounts_', overwrite_image=False,
-               cbar=True, counts_feal=None, for_print=False):
+               cbar=True, counts_feal=None, for_print=False, finer=False):
     maskDiag, ticklabels = get_mask_n_ticks(Counts)
     xlabel = 'Actor'
     ylabel = 'Affected'
@@ -419,7 +426,10 @@ def plotCounts(Counts, ax=None, title=None, vmin=None, vmax=None, cmap=CMAP_VALI
 
     if for_print:
         fig = plt.gcf()
-        fig.set_size_inches(PRINT_MATRIX_SIZE[0], PRINT_MATRIX_SIZE[1])
+        if finer:
+            fig.set_size_inches(PRINT_MATRIX_SIZE_FINER[0], PRINT_MATRIX_SIZE_FINER[1])
+        else:
+            fig.set_size_inches(PRINT_MATRIX_SIZE[0], PRINT_MATRIX_SIZE[1])
         fig.set_dpi(PRINT_DPI)
 
         save_plot(imageName, overwrite_image, saveFolder)

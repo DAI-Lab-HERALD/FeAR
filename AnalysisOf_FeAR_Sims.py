@@ -193,6 +193,8 @@ def plot_results_for_instances(InstanceID, ReadRecord, mdr_string='', saveFolder
 
     Scenario = ReadRecord['Scenario']
 
+    finer = False
+
     if saveFolder is not None:
         for_print = True
     else:
@@ -249,19 +251,28 @@ def plot_results_for_instances(InstanceID, ReadRecord, mdr_string='', saveFolder
     else:
         fear_title = (InstanceID + ' FeAR')
 
+    N_Agents = Scenario['N_Agents']
+
+    if N_Agents == 2:
+        fmt = '0.2f'
+    else:
+        fmt = '0.1f'
+
+    if N_Agents >= 4:
+        finer = True
+
     if ReadRecord[InstanceID].get('FeAL'):
         fear_ax = PlotGWorld.plotResponsibility(FeAR, FeAL=np.array(ReadRecord[InstanceID]['FeAL']),
                                                 annot_font_size=ANNOTATE_FONT_SIZE, plot_feal_separately=False,
-                                                title=fear_title, for_print=for_print,
+                                                title=fear_title, for_print=for_print, fmt=fmt, finer=finer,
                                                 saveFolder=saveFolder, imageName=record_instance_name + '_FeAR',
                                                 overwrite_image=overwrite_images)
     else:
         fear_ax = PlotGWorld.plotResponsibility(FeAR,
                                                 annot_font_size=ANNOTATE_FONT_SIZE,
-                                                title=fear_title, for_print=for_print,
+                                                title=fear_title, for_print=for_print, fmt=fmt, finer=finer,
                                                 saveFolder=saveFolder, imageName=record_instance_name + '_FeAR',
                                                 overwrite_image=overwrite_images)
-    N_Agents = Scenario['N_Agents']
 
     if (N_Agents == 2) and ReadRecord[InstanceID].get('ValidityOfMoves_Mdr'):
         validity_of_moves_mdr = np.array(ReadRecord[InstanceID]['ValidityOfMoves_Mdr'])
@@ -320,13 +331,13 @@ def plot_results_for_instances(InstanceID, ReadRecord, mdr_string='', saveFolder
             count_mdr_ax = PlotGWorld.plotCounts(ValidMoves_MdR, counts_feal=ValidMoves_MdR_FeAL,
                                                  title='Number of valid moves \nof Affected if \nActor does MdR ',
                                                  cmap=CMAP_4COUNT, annot_font_size=ANNOTATE_FONT_SIZE,
-                                                 saveFolder=saveFolder, for_print=for_print,
+                                                 saveFolder=saveFolder, for_print=for_print, finer=finer,
                                                  imageName=record_instance_name + '_validActions_mdr',
                                                  overwrite_image=overwrite_images);
             count_move_ax = PlotGWorld.plotCounts(ValidMoves_action1, counts_feal=ValidMoves_action_FeAL,
                                                   title='Number of valid moves \nof Affected for \nActor\'s chosen move.',
                                                   cmap=CMAP_4COUNT, annot_font_size=ANNOTATE_FONT_SIZE,
-                                                  saveFolder=saveFolder, for_print=for_print,
+                                                  saveFolder=saveFolder, for_print=for_print, finer=finer,
                                                   imageName=record_instance_name + '_validActions_move',
                                                   overwrite_image=overwrite_images);
         else:
