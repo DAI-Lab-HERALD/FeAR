@@ -244,15 +244,15 @@ class PlotGWorld:
         ax.set_xlim(xlim_heatmap)
 
         fig = plt.gcf()
-        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         if saveFolder is not None:
-
             fig.set_size_inches(PRINT_GWORLD_SIZE[0], PRINT_GWORLD_SIZE[1])
             fig.set_dpi(PRINT_DPI)
             plt.title('')
 
             save_plot(imageName, overwrite_image, saveFolder)
+        else:
+            fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         if not Animate:
             plt.show()
@@ -295,10 +295,18 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 
 def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, title='Responsibility',
                        plot_feal_separately=False, saveFolder=None, imageName='FeAR_', fmt=DECIMALS_FMT,
+                       skip_title=False, skip_xlabel=False,
                        overwrite_image=False, for_print=False, finer=False):
     maskDiag, ticklabels = get_mask_n_ticks(Resp)
     xlabel = 'Actor'
     ylabel = 'Affected'
+
+    if skip_title:
+        title = ''
+        imageName = imageName+'_noTitle'
+    if skip_xlabel:
+        xlabel = ''
+        imageName = imageName + '_noXlabel'
 
     if (plot_feal_separately is True) and (FeAL is not None):
         if ax is not None:
