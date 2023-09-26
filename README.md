@@ -1,5 +1,8 @@
 # FeAR
+
 ## Feasible Action-Space Reduction (FeAR) for Causal Responsibility in Multi-Agent Spatial Interactions
+
+Github repo for the publication : https://arxiv.org/abs/2305.15003.
 
 ## Contents
 
