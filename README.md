@@ -2,7 +2,7 @@
 
 ## Feasible Action-Space Reduction (FeAR) for Causal Responsibility in Multi-Agent Spatial Interactions
 
-Github repo for the publication : https://arxiv.org/abs/2305.15003.
+Github repository for the publication : https://ebooks.iospress.nl/volumearticle/64281.
 
 ## Contents
 
@@ -59,8 +59,7 @@ Github repo for the publication : https://arxiv.org/abs/2305.15003.
 - TU Delft AI Initiative
 
 ## Reference
-George, A., Siebert, L. C., Abbink, D., & Zgonnikov, A. (2023). Measuring Causal Responsibility in Multi-Agent Spatial Interactions with Feasible Action-Space Reduction. ECAI-23, accepted, https://arxiv.org/abs/2305.15003
-
+ A. George, L. Cavalcante Siebert, D. Abbink, and A. Zgonnikov, “Feasible Action-Space Reduction as a Metric of Causal Responsibility in Multi-Agent Spatial Interactions,” in Frontiers in Artificial Intelligence and Applications, K. Gal, A. Nowé, G. J. Nalepa, R. Fairstein, and R. Rădulescu, Eds., IOS Press, 2023. doi: 10.3233/FAIA230349. https://ebooks.iospress.nl/volumearticle/64281.
 
 ## Copyright notice
 
