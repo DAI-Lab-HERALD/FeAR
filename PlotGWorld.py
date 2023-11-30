@@ -202,13 +202,13 @@ class PlotGWorld:
             dy = path[1][1] - path[0][1]
 
             if dy == 0:  # Vertical Arrow
-                dx -= 2 * Margin_OneWayArrow  # Subtract Margin
-                x = path[0][0] + ArrowOffset + Margin_OneWayArrow  # Add Margin
+                dx -= 2 * Margin_OneWayArrow * np.sign(dx)  # Subtract Margin
+                x = path[0][0] + ArrowOffset + Margin_OneWayArrow * np.sign(dx)  # Add Margin
                 y = path[0][1] + ArrowOffset
             elif dx == 0:  # Horizontal Arrow
-                dy -= 2 * Margin_OneWayArrow  # Subtract Margin
+                dy -= 2 * Margin_OneWayArrow * np.sign(dy)  # Subtract Margin
                 x = path[0][0] + ArrowOffset
-                y = path[0][1] + ArrowOffset + Margin_OneWayArrow  # Add Margin
+                y = path[0][1] + ArrowOffset + Margin_OneWayArrow * np.sign(dy)  # Add Margin
 
             plt.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
                       lw=0.5, length_includes_head=True)
