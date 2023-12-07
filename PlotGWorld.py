@@ -27,6 +27,8 @@ CMAP_VALIDMOVES = sns.diverging_palette(360 - hue_validMoves, hue_validMoves, l=
 # MOVE_ARROW_COLOUR = 'tab:blue'
 # MOVE_ARROW_COLOUR = 'tab:grey'
 MOVE_ARROW_COLOUR = 'dimgrey'
+ONEWAY_ARROW_COLOUR = 'gold'
+WALL_COlOUR = 'tab:red'
 MOVE_ARROW_WIDTH = 0.05
 AGENT_BOX_OFFSET = 0.15
 
@@ -69,7 +71,7 @@ class PlotGWorld:
     # ----------------------------------------------------------------------------------------------- #
 
     def ViewGWorld(self, World, ViewNextStep=False, ViewActionTrail=True, ViewActionArrows=True, Animate=False, ax=None,
-                   saveFolder=None, imageName='GW_Snap', mark_agent_entropy=True,
+                   saveFolder=None, imageName='GW_Snap', mark_agent_entropy=True, show_one_way_as_restricted = True,
                    annot_font_size=6, overwrite_image=False):
 
         if ViewActionTrail:
@@ -142,10 +144,12 @@ class PlotGWorld:
 
         # Offset for plotting arrows
         ArrowOffset = 0.5
-        Margin_OneWayArrow = 0.2
         IndividualArrowOffset_Span = 1 - 2 * (AGENT_BOX_OFFSET + MOVE_ARROW_WIDTH)
         IndividualArrowOffset_Margin = (AGENT_BOX_OFFSET + MOVE_ARROW_WIDTH)
         IndividualArrowOffset_Delta = IndividualArrowOffset_Span / MaX_ArrowOffsets
+
+        Margin_OneWayArrow = 0.3
+        margin_oneway_strike = 0.1
 
         # Plot Actions Selected by the agents
         if ViewActionArrows:
@@ -201,17 +205,35 @@ class PlotGWorld:
             dx = path[1][0] - path[0][0]
             dy = path[1][1] - path[0][1]
 
+
             if dy == 0:  # Vertical Arrow
                 dx -= 2 * Margin_OneWayArrow * np.sign(dx)  # Subtract Margin
                 x = path[0][0] + ArrowOffset + Margin_OneWayArrow * np.sign(dx)  # Add Margin
                 y = path[0][1] + ArrowOffset
+                offset_strike = 0.1 * np.sign(dx) # Margin for strike through
             elif dx == 0:  # Horizontal Arrow
                 dy -= 2 * Margin_OneWayArrow * np.sign(dy)  # Subtract Margin
                 x = path[0][0] + ArrowOffset
                 y = path[0][1] + ArrowOffset + Margin_OneWayArrow * np.sign(dy)  # Add Margin
+                offset_strike = 0.1 * np.sign(dy) # Margin for strike through
 
-            plt.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
-                      lw=0.5, length_includes_head=True)
+            if show_one_way_as_restricted:
+                # Show the direction of the paths restricted by one-ways
+                # Depict paths restricted by one-ways
+                plt.arrow(y + dy, x + dx, -dy, -dx, ls='-', color=WALL_COlOUR, width=.05,
+                          lw=0.5, length_includes_head=True)
+                # Add a strike through the restricted paths
+                plt.plot([y - dx / 2 + offset_strike, y + dy + dx / 2 - offset_strike],
+                         [x - dy / 2 + offset_strike, x + dx + dy / 2 - offset_strike],
+                         ls='-', color=WALL_COlOUR, linewidth=1)
+            else:
+                # Show the direction of the one-ways
+                # Depict the one-way paths
+                plt.arrow(y, x, dy, dx, ls='-', color=ONEWAY_ARROW_COLOUR, width=.08,
+                          lw=0.5, length_includes_head=True)
+
+
+
 
         # Plot Walls
         for wall in World.WorldWalls:
@@ -231,7 +253,7 @@ class PlotGWorld:
                 dx = 0
                 dy = 1
 
-            plt.plot([y, y + dy], [x, x + dx], ls='-', color='tab:red', linewidth=2)
+            plt.plot([y, y + dy], [x, x + dx], ls='-', color=WALL_COlOUR, linewidth=2)
 
         #         # Plot Restricted Paths
         #         for path in self.RestrictedPaths:
