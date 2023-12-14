@@ -1,12 +1,14 @@
 # Functions for plotting GWorld
-import numpy as np;
+import numpy as np
 
 np.random.seed(0)
-import seaborn as sns;
+import seaborn as sns
+import matplotlib.colors as mcolors
 
 sns.set_theme(style="ticks")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.colors as mcolors
 
 import glob
 from PIL import Image
@@ -16,6 +18,8 @@ import GWorld
 import Agent
 import Emergence
 
+
+
 VerboseFlag = False
 # VerboseFlag = True
 
@@ -23,12 +27,14 @@ ColourPalette = "bone_r"
 # CMAP_VALIDMOVES = sns.cubehelix_palette(as_cmap=True, light=1, dark=0.3, gamma=0.5)
 hue_validMoves = 190
 CMAP_VALIDMOVES = sns.diverging_palette(360 - hue_validMoves, hue_validMoves, l=60, as_cmap=True)
+CMAP_FeAR = sns.diverging_palette(220, 20, as_cmap=True)
+cmap_FeAR_normalize = mcolors.Normalize(vmin=-1, vmax=1)
+CMAP_FeAR_SCALAR_MAPPABLE = plt.cm.ScalarMappable(cmap=CMAP_FeAR, norm=cmap_FeAR_normalize)
 
 # MOVE_ARROW_COLOUR = 'tab:blue'
 # MOVE_ARROW_COLOUR = 'tab:grey'
 MOVE_ARROW_COLOUR = 'dimgrey'
-ONEWAY_ARROW_COLOUR = 'gold'
-WALL_COlOUR = 'tab:red'
+MOVE_ARROW_COLOUR_MDR = 'deepskyblue'
 MOVE_ARROW_WIDTH = 0.05
 AGENT_BOX_OFFSET = 0.15
 
@@ -71,8 +77,9 @@ class PlotGWorld:
     # ----------------------------------------------------------------------------------------------- #
 
     def ViewGWorld(self, World, ViewNextStep=False, ViewActionTrail=True, ViewActionArrows=True, Animate=False, ax=None,
-                   saveFolder=None, imageName='GW_Snap', mark_agent_entropy=True, show_one_way_as_restricted = True,
-                   annot_font_size=6, overwrite_image=False):
+                   saveFolder=None, imageName='GW_Snap', mark_agent_entropy=True,
+                   annot_font_size=6, overwrite_image=False, colour_by_fear=False, fear_values=None,
+                   mdr_colour=False, game_mode=False, ego_id=0, apples=[]):
 
         if ViewActionTrail:
             WorldState = World.WorldState
@@ -116,27 +123,43 @@ class PlotGWorld:
         # ax = sns.heatmap(map_values, linewidths=1, annot=Annotations, mask=mask,
         #                  square=True,
         #                  cbar=False, cmap=ColourPalette, annot_kws={"size": annot_font_size})
-        plt.title('State of GWorld: ')
+        # plt.title('State of GWorld: ')
         # plt.axis('equal')
         plt.axis('off')
         xlim_heatmap = ax.get_xlim()
         ylim_heatmap = ax.get_ylim()
 
         #  Plotting boxes around agents
-        agent_colours = special_spectral_cmap(n_colours=len(World.AgentList))
+        if colour_by_fear and fear_values is not None:
+            if len(fear_values) == len(World.AgentList):
+                agent_colours = CMAP_FeAR_SCALAR_MAPPABLE.to_rgba(fear_values)
+            else:
+                print('Number of FeAR values passed in does not match the number of agents.')
+        else:
+            agent_colours = special_spectral_cmap(n_colours=len(World.AgentList), game_mode=game_mode, ego_id=ego_id)
 
         for xx in range(len_x):
             for yy in range(len_y):
                 if WorldState[xx][yy] > 0:
                     agentIdxxyy = WorldState[xx][yy].astype(int) - 1
+                    if agentIdxxyy == ego_id and game_mode:
+                        agent_annotation = '$\U0001F60C$'
+                        # agent_annotation = '$\U0001F604$'
+                    else:
+                        agent_annotation = str(agentIdxxyy + 1)
+
                     # ax = plot_rect_on_matrix(yy, xx, ax=ax, offset=-AGENT_BOX_OFFSET, color=MOVE_ARROW_COLOUR,
                     #                          linewidth=3)
 
                     ax = plot_rect_on_matrix(yy, xx, ax=ax, offset=-AGENT_BOX_OFFSET,
                                              linewidth=max(20 // axis_length_max, 1),
                                              color=agent_colours[agentIdxxyy], fill=True, zorder=5)
-                    ax.text(yy + 0.5, xx + 0.5, str(agentIdxxyy + 1), zorder=6, size=GWORLD_FONT_SIZE,
+                    ax.text(yy + 0.5, xx + 0.5, agent_annotation, zorder=6, size=GWORLD_FONT_SIZE,
                             horizontalalignment='center', verticalalignment='center_baseline')
+        for apple in apples:
+            ax.text(apple[1] + 0.5, apple[0] + 0.5, '$\U0001F604$', zorder=5, size=GWORLD_FONT_SIZE,
+                    horizontalalignment='center', verticalalignment='center_baseline', color='red')
+
 
         MaxSteps = World.MaxSteps
         # MaX_ArrowOffsets = np.ceil(MaxSteps/5)*5 # So as to get a multiple of 5
@@ -144,12 +167,10 @@ class PlotGWorld:
 
         # Offset for plotting arrows
         ArrowOffset = 0.5
+        Margin_OneWayArrow = 0.2
         IndividualArrowOffset_Span = 1 - 2 * (AGENT_BOX_OFFSET + MOVE_ARROW_WIDTH)
         IndividualArrowOffset_Margin = (AGENT_BOX_OFFSET + MOVE_ARROW_WIDTH)
         IndividualArrowOffset_Delta = IndividualArrowOffset_Span / MaX_ArrowOffsets
-
-        Margin_OneWayArrow = 0.3
-        margin_oneway_strike = 0.1
 
         # Plot Actions Selected by the agents
         if ViewActionArrows:
@@ -196,44 +217,36 @@ class PlotGWorld:
                 x = x0 + ArrowOffset_x
                 y = y0 + ArrowOffset_y
 
-                plt.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR, zorder=4,
+                if not mdr_colour:
+                    plt.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR, zorder=4,
+                              width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
+                              length_includes_head=True)
+                else:
+                    plt.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR_MDR, zorder=4,
                           width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
                           length_includes_head=True)
+
+                    if dx == 0 and dy == 0and idx == ego_id:  # Draw MdR square in case of stay
+                        ax = plot_rect_on_matrix(y0, x0, ax=ax, offset=-AGENT_BOX_OFFSET,
+                                                 linewidth=max(20 // axis_length_max, 2),
+                                                 color=MOVE_ARROW_COLOUR_MDR, fill=False, zorder=5)
 
         # Plot OneWays
         for path in World.WorldOneWays:
             dx = path[1][0] - path[0][0]
             dy = path[1][1] - path[0][1]
 
-
             if dy == 0:  # Vertical Arrow
                 dx -= 2 * Margin_OneWayArrow * np.sign(dx)  # Subtract Margin
                 x = path[0][0] + ArrowOffset + Margin_OneWayArrow * np.sign(dx)  # Add Margin
                 y = path[0][1] + ArrowOffset
-                offset_strike = 0.1 * np.sign(dx) # Margin for strike through
             elif dx == 0:  # Horizontal Arrow
                 dy -= 2 * Margin_OneWayArrow * np.sign(dy)  # Subtract Margin
                 x = path[0][0] + ArrowOffset
                 y = path[0][1] + ArrowOffset + Margin_OneWayArrow * np.sign(dy)  # Add Margin
-                offset_strike = 0.1 * np.sign(dy) # Margin for strike through
 
-            if show_one_way_as_restricted:
-                # Show the direction of the paths restricted by one-ways
-                # Depict paths restricted by one-ways
-                plt.arrow(y + dy, x + dx, -dy, -dx, ls='-', color=WALL_COlOUR, width=.05,
-                          lw=0.5, length_includes_head=True)
-                # Add a strike through the restricted paths
-                plt.plot([y - dx / 2 + offset_strike, y + dy + dx / 2 - offset_strike],
-                         [x - dy / 2 + offset_strike, x + dx + dy / 2 - offset_strike],
-                         ls='-', color=WALL_COlOUR, linewidth=1)
-            else:
-                # Show the direction of the one-ways
-                # Depict the one-way paths
-                plt.arrow(y, x, dy, dx, ls='-', color=ONEWAY_ARROW_COLOUR, width=.08,
-                          lw=0.5, length_includes_head=True)
-
-
-
+            plt.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
+                      lw=0.5, length_includes_head=True)
 
         # Plot Walls
         for wall in World.WorldWalls:
@@ -253,7 +266,7 @@ class PlotGWorld:
                 dx = 0
                 dy = 1
 
-            plt.plot([y, y + dy], [x, x + dx], ls='-', color=WALL_COlOUR, linewidth=2)
+            plt.plot([y, y + dy], [x, x + dx], ls='-', color='tab:red', linewidth=2)
 
         #         # Plot Restricted Paths
         #         for path in self.RestrictedPaths:
@@ -578,7 +591,19 @@ def make_gif_from_folder(folder, GifName='_NewGif', duration=500):
     return None
 
 
-def special_spectral_cmap(n_colours=5):
+def special_spectral_cmap(n_colours=5, game_mode=False, ego_id=0):
+    if game_mode:
+        ego_colour = (0.5820686065676477, 0.7683811347467602, 0.8872124391839864)
+        others_colour = (0.996078431372549, 0.8784313725490196, 0.5450980392156862)
+        colours = []
+        for ii in range(n_colours):
+            if ii == ego_id:
+                colours.append(ego_colour)
+            else:
+                colours.append(others_colour)
+        return colours
+
+
     # Function to get the set of spectral colours I like
     if n_colours >= 5:
         return sns.color_palette("Spectral", n_colors=n_colours)
@@ -611,6 +636,6 @@ def special_spectral_cmap(n_colours=5):
                 (0.5820686065676477, 0.7683811347467602, 0.8872124391839864)]
         # return list(colours[i] for i in [0, 8])
     else:
-        colours = sns.color_palette("Spectral", n_colours=9)
+        colours = sns.color_palette("Spectral", n_colors=9)
         return [(0.9155324875048059, 0.6192233756247598, 0.65440215301807)]
         # return colours[0]

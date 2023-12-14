@@ -237,7 +237,7 @@ def plot_results_for_instances(InstanceID, ReadRecord, mdr_string='', saveFolder
     ValidMoves_action1 = np.array(ReadRecord[InstanceID]['ValidMoves_action1'])
 
     world_ax = plotgw.ViewGWorld(World, ViewNextStep=True, ViewActionArrows=True, ViewActionTrail=False,
-                                 annot_font_size=ANNOTATE_FONT_SIZE, saveFolder=saveFolder,
+                                 annot_font_size=ANNOTATE_FONT_SIZE, saveFolder=saveFolder, Animate=True,
                                  imageName=record_instance_name + '_GW', overwrite_image=overwrite_images);
 
     map_size_x = np.size(World.WorldState, 0)
