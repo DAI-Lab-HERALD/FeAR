@@ -47,8 +47,11 @@ RECORD_FOLDER = 'Results'
 SAVE_IMAGES_TO = 'Plots'
 OVERWRITE_IMAGES = True
 
+
 JSON_4_PLOTS = 'Instances2plot.json'
 # JSON_4_PLOTS = 'Instances2plot_finer.json'
+
+FINER = True
 
 N_TOP = 10
 
@@ -193,7 +196,7 @@ def plot_results_for_instances(InstanceID, ReadRecord, mdr_string='', saveFolder
 
     Scenario = ReadRecord['Scenario']
 
-    finer = False
+    finer = FINER
 
     if saveFolder is not None:
         for_print = True

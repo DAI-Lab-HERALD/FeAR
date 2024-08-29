@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.colors as mcolors
 
+import matplotlib.image as mpimg
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
 import glob
 from PIL import Image
 import os
@@ -17,8 +20,6 @@ from tqdm import tqdm
 import GWorld
 import Agent
 import Emergence
-
-
 
 VerboseFlag = False
 # VerboseFlag = True
@@ -30,6 +31,10 @@ CMAP_VALIDMOVES = sns.diverging_palette(360 - hue_validMoves, hue_validMoves, l=
 CMAP_FeAR = sns.diverging_palette(220, 20, as_cmap=True)
 cmap_FeAR_normalize = mcolors.Normalize(vmin=-1, vmax=1)
 CMAP_FeAR_SCALAR_MAPPABLE = plt.cm.ScalarMappable(cmap=CMAP_FeAR, norm=cmap_FeAR_normalize)
+
+# Load your PNG image
+apple_image_path = 'star.png'  # Image courtesy : https://www.iconfinder.com/Tatyana.Kataykina
+apple_img = mpimg.imread(apple_image_path)
 
 # MOVE_ARROW_COLOUR = 'tab:blue'
 # MOVE_ARROW_COLOUR = 'tab:grey'
@@ -157,9 +162,19 @@ class PlotGWorld:
                     ax.text(yy + 0.5, xx + 0.5, agent_annotation, zorder=6, size=GWORLD_FONT_SIZE,
                             horizontalalignment='center', verticalalignment='center_baseline')
         for apple in apples:
-            ax.text(apple[1] + 0.5, apple[0] + 0.5, '$\U0001F604$', zorder=5, size=GWORLD_FONT_SIZE,
-                    horizontalalignment='center', verticalalignment='center_baseline', color='red')
+            # ax.text(apple[1] + 0.5, apple[0] + 0.5, '$\U0001F604$', zorder=5, size=GWORLD_FONT_SIZE,
+            #         horizontalalignment='center', verticalalignment='center_baseline', color='red')
 
+            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=15, color='goldenrod')
+            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=12, color='#FAC205')
+            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=10, color='gold')
+
+            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=15, color='gold', mec='#FAC205')
+
+            x, y = apple
+            imagebox = OffsetImage(apple_img, zoom=0.3)  # Adjust zoom to change the size of the image
+            ab = AnnotationBbox(imagebox, (y + 0.5, x + 0.5), frameon=False)
+            ax.add_artist(ab)
 
         MaxSteps = World.MaxSteps
         # MaX_ArrowOffsets = np.ceil(MaxSteps/5)*5 # So as to get a multiple of 5
@@ -602,7 +617,6 @@ def special_spectral_cmap(n_colours=5, game_mode=False, ego_id=0):
             else:
                 colours.append(others_colour)
         return colours
-
 
     # Function to get the set of spectral colours I like
     if n_colours >= 5:

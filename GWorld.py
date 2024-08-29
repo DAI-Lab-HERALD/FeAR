@@ -7,6 +7,8 @@ import pprint
 import Agent
 
 VerboseFlag = False
+
+
 # VerboseFlag = True
 
 
@@ -92,6 +94,36 @@ class GWorld:
     #         #----
 
     #         self.AnimateGWorld()
+
+    def __eq__(self, other):
+        if not isinstance(other, GWorld):
+            return NotImplemented
+        return (self.AgentList == other.AgentList and
+                self.AgentActiveStatus == other.AgentActiveStatus and
+                self.AgentCrash == other.AgentCrash and
+                self.RestrictedMove == other.RestrictedMove and
+                self.AgentLocations == other.AgentLocations and
+                self.MaxSteps == other.MaxSteps and
+                self.PreviousAgentLocations == other.PreviousAgentLocations and
+                np.array_equal(self.WorldMap, other.WorldMap) and
+                np.array_equal(self.WorldState, other.WorldState) and
+                self.RestrictedPaths == other.RestrictedPaths and
+                self.WorldWalls == other.WorldWalls and
+                self.WorldOneWays == other.WorldOneWays)
+
+    def __hash__(self):
+        return hash((tuple(self.AgentList),
+                     tuple(self.AgentActiveStatus),
+                     tuple(self.AgentCrash),
+                     tuple(self.RestrictedMove),
+                     tuple(self.AgentLocations),
+                     self.MaxSteps,
+                     tuple(self.PreviousAgentLocations),
+                     self.WorldMap.tobytes(),
+                     self.WorldState.tobytes(),
+                     tuple(map(tuple, self.RestrictedPaths)),
+                     tuple(map(tuple, self.WorldWalls)),
+                     tuple(map(tuple, self.WorldOneWays))))
 
     # ----------------------------------------------------------------------------------------------- #
     # Function to Add Agent : AddAgent( Agent , Location )
@@ -275,7 +307,6 @@ class GWorld:
                     elif self.NewAgentLocations[ii][step_ii_floor] == self.NewAgentLocations[jj][step_jj_ceil]:
                         # Possible Collision - if the hangovers don't match
 
-
                         overhang_floor = step_ii_ceil - step_ii
                         overhang_ceil = step_jj - step_jj_floor
                         overhang_condition = ((overhang_floor + overhang_ceil) <= 1)
@@ -287,8 +318,8 @@ class GWorld:
                         same_direction_condition = np.array_equal(direction_ii, direction_jj)
 
                         if VerboseFlag:
-                            print('same_direction_condition :',same_direction_condition)
-                            print('overhang_condition :',overhang_condition)
+                            print('same_direction_condition :', same_direction_condition)
+                            print('overhang_condition :', overhang_condition)
 
                         # If the above 2 conditions are met, then the agents can slide along without hitting each other
 
@@ -361,8 +392,8 @@ class GWorld:
             ########################################################################################################
 
             NewAgentLocations_CurrentFloor = self.revertStepsWithCollisions(step=step, \
-                                                                           NewAgentLocations_CurrentFloor= \
-                                                                               NewAgentLocations_CurrentFloor)
+                                                                            NewAgentLocations_CurrentFloor= \
+                                                                                NewAgentLocations_CurrentFloor)
 
             ########################################################################################################
 
@@ -390,7 +421,8 @@ class GWorld:
 
     # ----------------------------------------------------------------------------------------------- #
     # Function where the actions chosen by the agents are used to update the state of the world
-    def UpdateGWorld(self, defaultAction='random', ActionID4Agents=[]):
+    def UpdateGWorld(self, defaultAction='random', ActionID4Agents=[],
+                     apples=None, apple_eaters=None):
         # Get Agent Actions
         # Update AgentLocations and Check which agents are active
         # Update WorldState
@@ -421,6 +453,7 @@ class GWorld:
                 # Resetting Restricted Moves Record for all Agents
                 self.RestrictedMove[idx] = False
 
+        apples_caught = []
         # Getting (valid) NewLocations from action steps from Agents
         for step in np.arange(self.MaxSteps):
 
@@ -489,10 +522,29 @@ class GWorld:
             #############################################
 
             NewAgentLocations_CurrentFloor = self.collision_checks_and_resolution(step=step, \
-                                                                                 NewAgentLocations_CurrentFloor= \
-                                                                                     NewAgentLocations_CurrentFloor,
-                                                                                 VerboseFlag=VerboseFlag)
+                                                                                  NewAgentLocations_CurrentFloor= \
+                                                                                      NewAgentLocations_CurrentFloor,
+                                                                                  VerboseFlag=VerboseFlag)
             #############################################
+            # Check for Apples
+            eaten_apple_ids = []
+            if apples is not None and apple_eaters is not None:
+                print(f'{apples=}')
+                for idx in apple_eaters:
+                    for apple_id, apple in enumerate(apples):
+                        print(f'{apple_id=}, {apple=}')
+                        if NewAgentLocations_CurrentFloor[idx][0] == apple[0] and \
+                                NewAgentLocations_CurrentFloor[idx][1] == apple[1]:
+                            apples_caught.append([idx, apple_id])
+                            eaten_apple_ids.append(apple_id)
+                apple_ids = list(range(len(apples)))
+                uneaten_apple_ids = [x for x in apple_ids if x not in eaten_apple_ids]
+                apples = apples[uneaten_apple_ids]
+                print(f'{apples =}')
+                print(f'{apples_caught=}')
+
+
+
             #############################################
 
             self.update_agent_locations_2_world_state(NewAgentLocations_CurrentFloor=NewAgentLocations_CurrentFloor,
@@ -502,6 +554,9 @@ class GWorld:
 
         agent_crashes = self.AgentCrash.copy()
         restricted_moves = self.RestrictedMove.copy()
+
+        if apples is not None and apple_eaters is not None:
+            return agent_crashes, restricted_moves, apples, apples_caught
 
         return agent_crashes, restricted_moves
 
@@ -569,26 +624,50 @@ def LoadJsonScenario(json_filename='Scenarios.json', scenario_name='Base'):
 
     Scenario = data[scenario_name]
 
-    Map_ = dict()
-    Map_['Region'] = Scenario['Map']['Region']
+    if 'MdRs' in Scenario.keys():
+        for mdr_key in Scenario['MdRs']:
+            mdr = Scenario['MdRs'][mdr_key]
 
-    # Fixing the tuple format which is lost in JSON
-    for listname in ['Walls', 'OneWays']:
-        List_ = []
-        for path in Scenario['Map'][listname]:
-            path_ = []
-            for location in path:
-                path_.append(tuple(location))
-            List_.append(path_)
-        Map_[listname] = List_
+            for slice_key in ['slicex', 'slicey']:
+                slice_arg = mdr[slice_key]
+                if slice_arg[2] == 0:  # If slice_step is 0
+                    slice_ = slice(slice_arg[0], slice_arg[1], None)
+                else:
+                    slice_ = slice(slice_arg[0], slice_arg[1], slice_arg[2])
+                Scenario['MdRs'][mdr_key][slice_key] = slice_
 
-    Scenario['Map'] = Map_
+    if 'Policies' in Scenario.keys():
+        for policy_key in Scenario['Policies']:
+            policy = Scenario['Policies'][policy_key]
 
-    # Fixing the tuple format for AgentLocations
-    AgentLocations_ = []
-    for location in Scenario['AgentLocations']:
-        AgentLocations_.append(tuple(location))
-    Scenario['AgentLocations'] = AgentLocations_
+            for slice_key in ['slicex', 'slicey']:
+                slice_arg = policy[slice_key]
+                if slice_arg[2] == 0:  # If slice_step is 0
+                    slice_ = slice(slice_arg[0], slice_arg[1], None)
+                else:
+                    slice_ = slice(slice_arg[0], slice_arg[1], slice_arg[2])
+                Scenario['Policies'][policy_key][slice_key] = slice_
+
+    # Map_ = dict()
+    # Map_['Region'] = Scenario['Map']['Region']
+
+    # # Fixing the tuple format which is lost in JSON
+    # for listname in ['Walls', 'OneWays']:
+    #     List_ = []
+    #     for path in Scenario['Map'][listname]:
+    #         path_ = []
+    #         for location in path:
+    #             path_.append(tuple(location))
+    #         List_.append(path_)
+    #     Map_[listname] = List_
+
+    # Scenario['Map'] = Map_
+
+    # # Fixing the tuple format for AgentLocations
+    # AgentLocations_ = []
+    # for location in Scenario['AgentLocations']:
+    #     AgentLocations_.append(tuple(location))
+    # Scenario['AgentLocations'] = AgentLocations_
 
     return Scenario
 
