@@ -234,3 +234,6 @@ TSWLatexianTemp*
 **/__pycache__/**
 
 **/Results/**
+
+**/.ipynb_checkpoints/**
+
