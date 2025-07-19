@@ -44,7 +44,7 @@ MOVE_ARROW_WIDTH = 0.05
 AGENT_BOX_OFFSET = 0.15
 
 # PRINT_MATRIX_SIZE = [9, 3]
-PRINT_MATRIX_SIZE = [1.5, 1.5] # OG
+PRINT_MATRIX_SIZE = [1.5, 1.5]  # OG
 PRINT_MATRIX_SIZE_FINER = [2, 2]  # Finer
 
 # PRINT_GWORLD_SIZE = [8, 4]
@@ -75,9 +75,10 @@ class PlotGWorld:
     def __init__(self):
         #         #--- For Visualisation----
         self.Gfig, self.Gax = plt.subplots();
-        #         line, = self.Gax.plot([])     # A tuple unpacking to unpack the only plot
-        plt.clf();
-        plt.axis('equal');
+        # #         line, = self.Gax.plot([])     # A tuple unpacking to unpack the only plot
+        # plt.clf();
+        # plt.axis('equal');
+        pass
 
     # ----------------------------------------------------------------------------------------------- #
 
@@ -110,19 +111,21 @@ class PlotGWorld:
         mask = np.where(WorldState >= 0, 0, np.nan)
         mask_c = np.where(mask == 0, 1, 0)
 
-        plt.clf()
+        # plt.clf()
+        if ax is not None:
+            ax.clear()
+
         len_x, len_y = WorldState.shape
         axis_length_max = max(len_x, len_y)
 
         # Plot Agent IDs and Locations of the Map
-
         # Plotting Grey blocks for valid regions of the Map
         cmap_for_grey = cmap = sns.color_palette("Greys", as_cmap=True)
         ax = sns.heatmap(np.zeros_like(WorldState), linewidths=max(25 // axis_length_max, 3), square=True, mask=mask,
-                         linecolor='whitesmoke',
+                         linecolor='whitesmoke', ax=ax,
                          cbar=False, cmap=cmap_for_grey, vmax=10, vmin=-3)
         ax = sns.heatmap(np.zeros_like(WorldState), linewidths=max(25 // axis_length_max, 3) - 2, square=True,
-                         mask=mask_c,
+                         mask=mask_c, ax=ax,
                          cbar=False, cmap=cmap_for_grey, vmax=10, vmin=0)
         # Plotting Agent Locations with Annotations
         # ax = sns.heatmap(map_values, linewidths=1, annot=Annotations, mask=mask,
@@ -130,7 +133,8 @@ class PlotGWorld:
         #                  cbar=False, cmap=ColourPalette, annot_kws={"size": annot_font_size})
         # plt.title('State of GWorld: ')
         # plt.axis('equal')
-        plt.axis('off')
+        # plt.axis('off')
+        ax.set_axis_off()
         xlim_heatmap = ax.get_xlim()
         ylim_heatmap = ax.get_ylim()
 
@@ -233,15 +237,15 @@ class PlotGWorld:
                 y = y0 + ArrowOffset_y
 
                 if not mdr_colour:
-                    plt.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR, zorder=4,
+                    ax.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR, zorder=4,
                               width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
                               length_includes_head=True)
                 else:
-                    plt.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR_MDR, zorder=4,
-                          width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
-                          length_includes_head=True)
+                    ax.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR_MDR, zorder=4,
+                              width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
+                              length_includes_head=True)
 
-                    if dx == 0 and dy == 0and idx == ego_id:  # Draw MdR square in case of stay
+                    if dx == 0 and dy == 0 and idx == ego_id:  # Draw MdR square in case of stay
                         ax = plot_rect_on_matrix(y0, x0, ax=ax, offset=-AGENT_BOX_OFFSET,
                                                  linewidth=max(20 // axis_length_max, 2),
                                                  color=MOVE_ARROW_COLOUR_MDR, fill=False, zorder=5)
@@ -260,7 +264,7 @@ class PlotGWorld:
                 x = path[0][0] + ArrowOffset
                 y = path[0][1] + ArrowOffset + Margin_OneWayArrow * np.sign(dy)  # Add Margin
 
-            plt.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
+            ax.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
                       lw=0.5, length_includes_head=True)
 
         # Plot Walls
@@ -281,7 +285,7 @@ class PlotGWorld:
                 dx = 0
                 dy = 1
 
-            plt.plot([y, y + dy], [x, x + dx], ls='-', color='tab:red', linewidth=2)
+            ax.plot([y, y + dy], [x, x + dx], ls='-', color='tab:red', linewidth=2)
 
         #         # Plot Restricted Paths
         #         for path in self.RestrictedPaths:
@@ -294,19 +298,20 @@ class PlotGWorld:
         ax.set_ylim(ylim_heatmap)
         ax.set_xlim(xlim_heatmap)
 
-        fig = plt.gcf()
+        # fig = plt.gcf()
+        fig = ax.get_figure()
 
         if saveFolder is not None:
             fig.set_size_inches(PRINT_GWORLD_SIZE[0], PRINT_GWORLD_SIZE[1])
             fig.set_dpi(PRINT_DPI)
-            plt.title('')
+            ax.set_title('')
 
             save_plot(imageName, overwrite_image, saveFolder)
         else:
             fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         if not Animate:
-            plt.show()
+            fig.show()
 
         return ax
 
@@ -315,7 +320,7 @@ class PlotGWorld:
 
 def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor='white',
                xticklabels='auto', yticklabels='auto', ax=None, annot=True,
-               vmin=-1, vmax=1, center=0, title=None, cbar=True,
+               vmin=-1, vmax=1, center=0, title=None, cbar=None, annot_colour=None,
                annot_font_size=5, fmt=DECIMALS_FMT, for_print=False):
     if cmap is None:
         cmap = sns.diverging_palette(220, 20, as_cmap=True, sep=1)
@@ -325,9 +330,17 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 
     if for_print:
         square = False
-        cbar = False
+
+        if cbar is None:
+            cbar = False
     else:
         square = True
+
+    if annot_colour:
+        annot_kws = {"size": annot_font_size,
+                     'color': annot_colour}
+    else:
+        annot_kws = {"size": annot_font_size}
 
     # To get manage the rounding error caused by eps in the denominator and
     # string formatting to one decimal place
@@ -335,7 +348,7 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 
     sns.heatmap(Matrix.T, linewidths=1, cbar=cbar, cmap=cmap, square=square, center=center, vmin=vmin, vmax=vmax,
                 xticklabels=xticklabels, yticklabels=yticklabels, ax=ax, annot=annot, fmt=fmt, linecolor=linecolor,
-                mask=mask, annot_kws={"size": annot_font_size})
+                mask=mask, annot_kws=annot_kws)
     ax.invert_yaxis()
     ax.set_title(title)
     ax.set_xlabel(xlabel)
@@ -344,9 +357,9 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
     return ax
 
 
-def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, title='Responsibility',
+def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, title='Responsibility',
                        plot_feal_separately=False, saveFolder=None, imageName='FeAR_', fmt=DECIMALS_FMT,
-                       skip_title=False, skip_xlabel=False,
+                       skip_title=False, skip_xlabel=False, add_hatches=True, gray_feal=True,
                        overwrite_image=False, for_print=False, finer=False):
     maskDiag, ticklabels = get_mask_n_ticks(Resp)
     xlabel = 'Actor'
@@ -354,10 +367,14 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, t
 
     if skip_title:
         title = ''
-        imageName = imageName+'_noTitle'
+        imageName = imageName + '_noTitle'
     if skip_xlabel:
         xlabel = ''
         imageName = imageName + '_noXlabel'
+
+    # Generate a custom diverging colormap
+    cmap = sns.diverging_palette(230, 20, as_cmap=True)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=-1, vmax=1))
 
     if (plot_feal_separately is True) and (FeAL is not None):
         if ax is not None:
@@ -389,11 +406,41 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=True, annot_font_size=8, t
 
             mask_feal = np.where(maskDiag == 0, 1, 0)
             ax = plotMatrix(FeAL_matrix, mask=mask_feal, xlabel=xlabel, ylabel=ylabel, title=title, vmin=0, fmt=fmt,
-                            xticklabels=ticklabels, yticklabels=ticklabels, ax=ax, annot_font_size=annot_font_size,
+                            xticklabels=ticklabels, yticklabels=ticklabels, ax=ax,
+                            annot_font_size=annot_font_size, annot_colour='black',
                             cbar=False, for_print=for_print);
 
             for xx in range(N_Agents):
-                ax = plot_rect_on_matrix(xx, xx, ax=ax, offset=-0.08, color='white', linewidth=2)
+                # ax = plot_rect_on_matrix(xx, xx, ax=ax, offset=-0.08, color=sm.to_rgba(0), linewidth=0,
+                #                          fill=True)
+                if gray_feal:
+                    ax = plot_rect_on_matrix(xx, xx, ax=ax, offset=0, color='lightgray', linewidth=0,
+                                             fill=True)
+                ax = plot_rect_on_matrix(xx, xx, ax=ax, offset=-0.9, color=sm.to_rgba(0), linewidth=0,
+                                         fill=True)
+
+    if add_hatches:
+
+        # Overlay hatching for negative and positive values
+        tt = 0.000
+        # c_del = 0.95
+        c_del = 0.3
+        for jj in range(Resp.shape[0]):
+            for ii in range(Resp.shape[1]):
+                if ii == jj:
+                    continue
+
+                if Resp[jj, ii] < 0:
+                    ax.add_patch(plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, hatch='....',
+                                               edgecolor=sm.to_rgba(-c_del), lw=0))
+                    ax.add_patch(
+                        plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, edgecolor='white', lw=1))
+
+                elif Resp[jj, ii] > 0:
+                    ax.add_patch(plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, hatch='//',
+                                               edgecolor=sm.to_rgba(1 - c_del), lw=0))
+                    ax.add_patch(
+                        plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, edgecolor='white', lw=1))
 
     if for_print:
         fig = plt.gcf()
@@ -577,14 +624,15 @@ def plot_valid_actions(validity_of_actions=None, ax=None, title=None, only_horiz
     return ax
 
 
-def plot_rect_on_matrix(x, y, ax=None, offset=0.05, color='gainsboro', linewidth=3, zorder=1, fill=False):
+def plot_rect_on_matrix(x, y, ax=None, offset=0.05, color='gainsboro', linewidth=3, zorder=1, fill=False,
+                        x_len=1, y_len=1):
     if ax is None:
         print('No Axis Passed!')
         return False
 
     if fill == False:
-        ax.plot([x - offset, x - offset, x + 1 + offset, x + 1 + offset, x - offset],
-                [y - offset, y + 1 + offset, y + 1 + offset, y - offset, y - offset], color=color, linewidth=linewidth,
+        ax.plot([x - offset, x - offset, x + x_len + offset, x + x_len + offset, x - offset],
+                [y - offset, y + y_len + offset, y + y_len + offset, y - offset, y - offset], color=color, linewidth=linewidth,
                 zorder=zorder)
     else:  # Using patches for fill
         rect = patches.Rectangle((x - offset, y - offset), (1 + 2 * offset), (1 + 2 * offset), zorder=zorder,

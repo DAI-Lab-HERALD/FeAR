@@ -20,7 +20,7 @@ import Responsibility
 import Emergence
 import PlotGWorld
 
-import Plot_cFeAR_ as plotcf
+import Plot_cFeAR as plotcf
 
 plotgw = PlotGWorld.PlotGWorld();  # Object for accessing plotters
 import AnalysisOf_FeAR_Sims as FeARUI
@@ -33,20 +33,23 @@ from pygame.locals import *
 TIMED = True
 CHEAT_TIMED = True
 RESET_SCORES = False
-# RESET_SCORES = True
+RESET_SCORES = True
+
+REMOVE_COLLIDING_AGENTS = False
+
 # N_TRIALS = 10
-N_TRIALS = 15
+N_TRIALS = 10
 FEAR_POINTS = 5000
 CRASH_POINTS = 1000
 APPLE_POINTS = 500
 # N_APPLES = 20
-N_APPLES = 50
+N_APPLES = 25
 
 
-TIME_ACTION_SELECTION = 10000
+TIME_ACTION_SELECTION = 5000
 # TIME_WINDOW = 5000
 TIME_WINDOW = 500
-FEAR_TIME_WINDOW = 10000
+FEAR_TIME_WINDOW = 1000
 
 pygame.init()
 pygame_icon = pygame.image.load('Game_of_FeAR_icon.png')
@@ -805,18 +808,38 @@ class runGWorld:
         # ------------------------------------------------------------------------------------------------------------------
         # ------------------------------------------------------------------------------------------------------------------
 
-    def calculate_FeAR(self):
+    def calculate_FeAR(self, use_panic=False):
         # Responsibility
-        # Calculate Responsibility Metric for the chosen Actions
-        self.FeAR, _, _, _, _ = Responsibility.FeAR(self.World, self.Action4Agents, self.MdR4Agents)
-        # self.FeAR, _, _, _, _ = Responsibility.FeAR_4_one_actor(self.World, self.Action4Agents, self.MdR4Agents,
-        #                                                         actor_ii=0)
-        # self.FeAL, _, _, _, _ = Responsibility.FeAL(self.World, self.Action4Agents, self.MdR4Agents)
+
+        if use_panic:
+            # PANIC for FeAR
+            self.FeAR, _, _, _, _ = Responsibility.panic_4_fear(self.World, self.Action4Agents, self.MdR4Agents)
+
+        else:
+            # Calculate Responsibility Metric for the chosen Actions
+            self.FeAR, _, _, _, _ = Responsibility.FeAR(self.World, self.Action4Agents, self.MdR4Agents)
+
+            # self.FeAR, _, _, _, _ = Responsibility.FeAR_4_one_actor(self.World, self.Action4Agents, self.MdR4Agents,
+            #                                                         actor_ii=0)
+            # self.FeAL, _, _, _, _ = Responsibility.FeAL(self.World, self.Action4Agents, self.MdR4Agents)
+
+
 
     def gworld_update(self):
         # Update World with Selected Steps
         agent_crashes, restricted_moves, self.apples, apples_caught = \
             self.World.UpdateGWorld(ActionID4Agents=self.Action4Agents, apples=self.apples, apple_eaters=[0])
+
+        if REMOVE_COLLIDING_AGENTS:
+            agents_to_remove = []
+            for agent in range(1, len(agent_crashes)):  # Skip the ego agent !
+                if agent_crashes[agent] == 1:
+                    agents_to_remove.append(agent)
+
+            # Reverse the order to prevent messing the ids
+            agents_to_remove.sort(reverse=True)
+            for agent in agents_to_remove:
+                self.World.RemoveAgent(agentID=agent)
 
         if agent_crashes[0]:
             n_crashes = 1

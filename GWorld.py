@@ -3,6 +3,8 @@ import numpy as np;
 np.random.seed(0)
 import json
 import pprint
+import copy
+from functools import lru_cache
 
 import Agent
 
@@ -23,6 +25,7 @@ class GWorld:
         self.AgentLocations = []
         self.MaxSteps = 4
         self.PreviousAgentLocations = []
+        self.NewAgentLocations = []
 
         self.WorldMap = Map  # Grid with 0 for inactive cells and 1 for active cells
 
@@ -150,6 +153,22 @@ class GWorld:
             return False
 
     # ----------------------------------------------------------------------------------------------- #
+    # Function to remove an Agent !
+    def RemoveAgent(self, agentID):
+        if VerboseFlag: print(f'Removing agent {agentID + 1} !')
+
+        location = self.AgentLocations[agentID]
+        self.WorldState[location] = 0
+
+        self.AgentList.pop(agentID)
+        self.AgentActiveStatus.pop(agentID)
+        self.AgentCrash.pop(agentID)
+        self.RestrictedMove.pop(agentID)
+        self.AgentLocations.pop(agentID)
+
+        pass
+
+    # ----------------------------------------------------------------------------------------------- #
     # Function get ActionSelection for Agents to be used in UpdateGWorld
     def getActionSelection4UpdateGWorld(self, ActionID4Agents=[], VerboseFlag=False, defaultAction='random'):
 
@@ -230,7 +249,10 @@ class GWorld:
                 self.WorldState[(self.AgentLocations[idx])] = idx + 1
         pass
 
-    def collision_checks_and_resolution(self, step=None, NewAgentLocations_CurrentFloor=None, VerboseFlag=False):
+    def collision_checks_and_resolution(self, step=None,
+                                        NewAgentLocations_CurrentFloor=None,
+                                        resolve=True,
+                                        VerboseFlag=False, ):
 
         if step is None:
             print('Step not passed.')
@@ -247,11 +269,13 @@ class GWorld:
         CollisionCount = NumberOfAgents  # No Agents => No Collisions
         LoopCount = 0  # Fail Safe in case of Unresolved Collisions
 
-        while (CollisionCount > 0) and (LoopCount < 2 * NumberOfAgents):
+        while (CollisionCount > 0) and (LoopCount < 2 * NumberOfAgents):  # Arbitrary upper limit for LoopCount
             LoopCount += 1
 
             if VerboseFlag: print('Collisions : ', CollisionCount)
+
             CollisionCount = 0  # Reset the counter
+
             for ii in np.arange(NumberOfAgents - 1):
                 step_ii = (step + 1) * (len(self.AgentList[ii].SelectedAction)) / (self.MaxSteps)
                 step_ii_floor = np.floor(step_ii).astype(int)
@@ -329,6 +353,7 @@ class GWorld:
                                 print('Collision !')
                                 self.print_collision_report(ii, jj, step_ii_ceil, step_ii_floor, step_jj_ceil,
                                                             step_jj_floor)
+
                             CollisionCount = self.record_collision(CollisionCount, ii, jj)
                             # ---------------------------------#
                             # ---------------------------------#
@@ -367,7 +392,6 @@ class GWorld:
                             # ---------------------------------#
                             # ---------------------------------#
 
-
                     elif (((self.NewAgentLocations[ii][step_ii_floor] == self.AgentLocations[jj]) and
                            (self.AgentLocations[ii] == self.NewAgentLocations[jj][step_jj_floor])) or
                           ((self.NewAgentLocations[ii][step_ii_ceil] == self.AgentLocations[jj]) and
@@ -391,8 +415,9 @@ class GWorld:
 
             ########################################################################################################
 
-            NewAgentLocations_CurrentFloor = self.revertStepsWithCollisions(step=step, \
-                                                                            NewAgentLocations_CurrentFloor= \
+            if resolve:
+                NewAgentLocations_CurrentFloor = self.revertStepsWithCollisions(step=step,
+                                                                                NewAgentLocations_CurrentFloor=
                                                                                 NewAgentLocations_CurrentFloor)
 
             ########################################################################################################
@@ -428,6 +453,7 @@ class GWorld:
         # Update WorldState
 
         if VerboseFlag: print("Updating GWorld")
+
         self.PreviousAgentLocations = self.AgentLocations.copy()
 
         self.WorldState = np.where(self.WorldMap == 0, np.nan, self.WorldMap)  # Inactive Cells - NaN
@@ -437,7 +463,6 @@ class GWorld:
         self.NewAgentLocations = []
         for AgentLocation in self.AgentLocations:
             self.NewAgentLocations.append([AgentLocation])
-        # self.NewAgentLocations = self.AgentLocations.copy()
 
         ##################################################################
 
@@ -521,12 +546,13 @@ class GWorld:
 
             #############################################
 
-            NewAgentLocations_CurrentFloor = self.collision_checks_and_resolution(step=step, \
-                                                                                  NewAgentLocations_CurrentFloor= \
-                                                                                      NewAgentLocations_CurrentFloor,
+            NewAgentLocations_CurrentFloor = self.collision_checks_and_resolution(step=step,
+                                                                                  NewAgentLocations_CurrentFloor=
+                                                                                  NewAgentLocations_CurrentFloor,
                                                                                   VerboseFlag=VerboseFlag)
             #############################################
             # Check for Apples
+
             eaten_apple_ids = []
             if apples is not None and apple_eaters is not None:
                 print(f'{apples=}')
@@ -542,8 +568,6 @@ class GWorld:
                 apples = apples[uneaten_apple_ids]
                 print(f'{apples =}')
                 print(f'{apples_caught=}')
-
-
 
             #############################################
 
@@ -601,11 +625,6 @@ class GWorld:
         return ActionID4Agents
 
     # ----------------------------------------------------------------------------------------------- #
-    # Function to remove an Agent - NOT IMPLEMENTED YET !
-    def RemoveAgent(self, Agent):
-        pass
-
-    # ----------------------------------------------------------------------------------------------- #
     def GetAgentContext(self):
         pass
 
@@ -614,6 +633,301 @@ class GWorld:
         pass
 
     # ----------------------------------------------------------------------------------------------- #
+    def get_feasibile_actions_for_affected(self,
+                                           affectedID=None,
+                                           defaultAction='random',
+                                           ActionID4Agents=[]):
+        return self.get_feasibile_actions_for_affected_tuple(affectedID=affectedID,
+                                                      defaultAction=defaultAction,
+                                                      ActionID4Agents=tuple(ActionID4Agents))
+
+    @lru_cache(maxsize=None)
+    def get_feasibile_actions_for_affected_tuple(self,
+                                                 affectedID=None,
+                                                 defaultAction='random',
+                                                 ActionID4Agents=[]):
+        ActionID4Agents = list(ActionID4Agents)
+
+        assert affectedID is not None
+
+        affected = self.AgentList[affectedID]
+        afffected_action_list = affected.Actions
+        feasible_action_ids = list(range(len(afffected_action_list)))
+        affected_location = self.AgentLocations[affectedID]
+
+        other_world = copy.deepcopy(self)  # Make a copy of the World
+        ##################################################################
+        other_world.getActionSelection4UpdateGWorld(ActionID4Agents,
+                                                    defaultAction=defaultAction)
+        ##################################################################
+        other_world.RemoveAgent(agentID=affectedID)  # Remove the affected agent from it after updating actions
+
+        other_world.PreviousAgentLocations = other_world.AgentLocations.copy()
+
+        # Inactive Cells - NaN
+        other_world.WorldState = np.where(other_world.WorldMap == 0, np.nan, other_world.WorldMap)
+        # Active Cells - 0 at the start
+        other_world.WorldState = np.where(other_world.WorldState == 1, 0, other_world.WorldState)
+
+        # If nothing happens, the agents will be in the old positions
+        other_world.NewAgentLocations = []
+        for AgentLocation in other_world.AgentLocations:
+            other_world.NewAgentLocations.append([AgentLocation])
+
+        for idx, agent in enumerate(other_world.AgentList):
+            if other_world.AgentActiveStatus[idx] is True:
+                # Resetting Crash Record for all the Agents
+                other_world.AgentCrash[idx] = False
+                # Resetting Restricted Moves Record for all Agents
+                other_world.RestrictedMove[idx] = False
+
+        old_agent_locations_for_affected = []
+        new_agent_locations_for_affected = []
+        for actionID in range(len(affected.Actions)):
+            old_agent_locations_for_affected.append([affected_location])
+            # if nothing happens, the affected stays at its original location
+            new_agent_locations_for_affected.append([affected_location])
+
+        actions_to_remove = []
+
+        # Getting (valid) NewLocations from action steps from Agents
+        for step in np.arange(other_world.MaxSteps):
+            # Updating new locations and checking validity of moves for affected
+
+            for actionID in feasible_action_ids:
+                affected_selectedAction = afffected_action_list[actionID]
+                if step < len(affected_selectedAction):
+                    ActionStep = affected_selectedAction[step]
+
+                else:
+                    ActionStep = (0, 0)  # If no steps left in SelectedAction
+
+                old_location = new_agent_locations_for_affected[actionID][step]
+                new_location = (old_location[0] + ActionStep[0], old_location[1] + ActionStep[1])
+
+                # Making sure that the agents are not pushed off the grid
+                new_location0 = np.clip(new_location[0], 0, other_world.WorldMap.shape[0] - 1)
+                new_location1 = np.clip(new_location[1], 0, other_world.WorldMap.shape[1] - 1)
+                # Restricted move if the new location is clipped.
+                if not new_location == (new_location0, new_location1):
+                    actions_to_remove.append(actionID)
+                    continue
+
+                AgentPath = [old_location, new_location]
+
+                # Checking if the new position is a valid location
+                if other_world.WorldState[new_location] >= 0:
+                    # Checking is the move is along a restricted path
+                    if AgentPath not in other_world.RestrictedPaths:
+                        new_agent_locations_for_affected[actionID].append(new_location)
+
+                    else:  # Setting OldLocation in case of Restricted Paths
+                        actions_to_remove.append(actionID)
+                        continue
+
+                else:  # Setting OldLocation in case of Invalid Location
+                    actions_to_remove.append(actionID)
+                    continue
+
+            # Remove actions with collisions
+            for action_id in actions_to_remove:
+                feasible_action_ids.remove(action_id)
+            actions_to_remove = []  # Clear actions_to_remove
+            # print(f'Restricted:{feasible_action_ids=}')
+
+            ########################################################################################################################
+
+            # Updating new locations and checking validity of moves for other_world
+            NewAgentLocations_CurrentFloor = other_world.AgentLocations.copy()
+
+            for idx, agent in enumerate(other_world.AgentList):
+                if (other_world.AgentActiveStatus[idx] is True):
+                    if step < len(agent.SelectedAction) and (other_world.AgentCrash[idx] is False):
+                        ActionStep = agent.SelectedAction[step]
+
+                    else:
+                        ActionStep = (0, 0)  # If no steps left in SelectedAction
+
+                    old_location = other_world.NewAgentLocations[idx][step]
+                    new_location = (old_location[0] + ActionStep[0], old_location[1] + ActionStep[1])
+
+                    # Making sure that the agents are not pushed off the grid
+                    new_location0 = np.clip(new_location[0], 0, other_world.WorldMap.shape[0] - 1)
+                    new_location1 = np.clip(new_location[1], 0, other_world.WorldMap.shape[1] - 1)
+                    # Restricted move if the new location is clipped.
+                    if not new_location == (new_location0, new_location1):
+                        other_world.RestrictedMove[idx] = True
+                        new_location = (new_location0, new_location1)
+
+                    AgentPath = [old_location, new_location]
+
+                    # Checking if the new position is a valid location
+                    if other_world.WorldState[new_location] >= 0:
+                        # Checking is the move is along a restricted path
+                        if AgentPath not in other_world.RestrictedPaths:
+                            other_world.NewAgentLocations[idx].append(new_location)
+
+                        else:  # Setting OldLocation in case of Restricted Paths
+                            other_world.NewAgentLocations[idx].append(old_location)
+                            # Record Restricted Move
+                            other_world.RestrictedMove[idx] = True
+                            # Print NewAgentLocation
+
+                    else:  # Setting OldLocation in case of Invalid Location
+                        other_world.NewAgentLocations[idx].append(old_location)
+                        # Record Restricted Move
+                        other_world.RestrictedMove[idx] = True
+                        # Print NewAgentLocation
+
+                        # Updating the NewAgentLocation when it is valid
+
+            #############################################
+            # Check feasibility of actions and update list of feasible actions
+            feasible_action_ids = self.collision_checks_affected(other_world=other_world,
+                                                                 step=step,
+                                                                 affected=affected,
+                                                                 afffected_action_list=afffected_action_list,
+                                                                 new_agent_locations_for_affected=
+                                                                 new_agent_locations_for_affected,
+                                                                 old_agent_locations_for_affected=
+                                                                 old_agent_locations_for_affected,
+                                                                 feasible_action_ids=feasible_action_ids,
+                                                                 )
+            # print(f'Collision:{feasible_action_ids=}')
+            #############################################
+            # Check and resolve collisions for other_world
+
+            NewAgentLocations_CurrentFloor = \
+                other_world.collision_checks_and_resolution(step=step,
+                                                            NewAgentLocations_CurrentFloor=NewAgentLocations_CurrentFloor,
+                                                            VerboseFlag=VerboseFlag)
+            #############################################
+
+            other_world.update_agent_locations_2_world_state(
+                NewAgentLocations_CurrentFloor= NewAgentLocations_CurrentFloor)
+
+            # Update old locations for affected agent at the end of a step
+            for actionID in feasible_action_ids:
+                old_agent_locations_for_affected[actionID].append(new_agent_locations_for_affected[actionID][step])
+
+            #############################################
+
+        valid_moves_count = len(feasible_action_ids)
+        validity_of_moves_of_affected = np.zeros(len(afffected_action_list))
+        for actionID in feasible_action_ids:
+            validity_of_moves_of_affected[actionID] = 1
+
+        return valid_moves_count, validity_of_moves_of_affected
+
+    @staticmethod
+    def collision_checks_affected(other_world,
+                                  affected=None,
+                                  afffected_action_list=None,
+                                  new_agent_locations_for_affected=None,
+                                  old_agent_locations_for_affected=None,
+                                  feasible_action_ids=None,
+                                  step=None, ):
+
+        assert step is not None
+        assert affected is not None
+        assert afffected_action_list is not None
+        assert new_agent_locations_for_affected is not None
+        assert old_agent_locations_for_affected is not None
+        assert feasible_action_ids is not None
+
+        # ..........................................#
+
+        # Check for collisions in the NewAgentLocations
+        NumberOfAgents = len(other_world.AgentList)
+
+        actions_to_remove = []
+
+        for action_id in feasible_action_ids:
+            step_jj = (step + 1) * (len(afffected_action_list[action_id])) / (other_world.MaxSteps)
+            step_jj_floor = np.floor(step_jj).astype(int)
+            step_jj_ceil = np.ceil(step_jj).astype(int)
+
+            location_jj_floor = new_agent_locations_for_affected[action_id][step_jj_floor]
+            location_jj_ceil = new_agent_locations_for_affected[action_id][step_jj_ceil]
+            old_location_jj = old_agent_locations_for_affected[action_id]
+
+            for ii in np.arange(NumberOfAgents):
+                step_ii = (step + 1) * (len(other_world.AgentList[ii].SelectedAction)) / (other_world.MaxSteps)
+                step_ii_floor = np.floor(step_ii).astype(int)
+                step_ii_ceil = np.ceil(step_ii).astype(int)
+
+                location_ii_floor = other_world.NewAgentLocations[ii][step_ii_floor]
+                location_ii_ceil = other_world.NewAgentLocations[ii][step_ii_ceil]
+
+                old_location_ii = other_world.AgentLocations[ii]
+
+                if (location_ii_floor == location_jj_floor) or \
+                        (location_ii_ceil == location_jj_ceil):
+                    actions_to_remove.append(action_id)
+                    break
+
+                elif (location_ii_floor == location_jj_ceil) and \
+                        (location_ii_ceil == location_jj_floor):
+                    # CROSSOVER COLLISION ! in NewLocations
+                    actions_to_remove.append(action_id)
+                    break
+
+                elif location_ii_floor == location_jj_ceil:
+                    # Possible Collision - if the hangovers don't match
+
+                    overhang_floor = step_ii_ceil - step_ii
+                    overhang_ceil = step_jj - step_jj_floor
+                    overhang_condition = ((overhang_floor + overhang_ceil) <= 1)
+
+                    direction_ii = np.array(location_ii_ceil) - np.array(location_ii_floor)
+                    direction_jj = np.array(location_jj_ceil) - np.array(location_jj_floor)
+                    same_direction_condition = np.array_equal(direction_ii, direction_jj)
+
+                    # If the above 2 conditions are met, then the agents can slide along without hitting each other
+
+                    if not (overhang_condition and same_direction_condition):
+                        # Collision happens in the case where the above conditions are not met.
+                        actions_to_remove.append(action_id)
+                        break
+
+                elif location_ii_ceil == location_jj_floor:
+                    # Possible Collision - if the hangovers don't match
+                    overhang_floor = step_jj_ceil - step_jj
+                    overhang_ceil = step_ii - step_ii_floor
+                    overhang_condition = ((overhang_floor + overhang_ceil) <= 1)
+
+                    direction_ii = np.array(location_ii_ceil) \
+                                   - np.array(location_ii_floor)
+                    direction_jj = np.array(location_jj_ceil) \
+                                   - np.array(location_jj_floor)
+                    same_direction_condition = np.array_equal(direction_ii, direction_jj)
+
+                    # If the above 2 conditions are met, then the agents can slide along without hitting each other
+
+                    if not (overhang_condition and same_direction_condition):
+                        # Collision happens in the case where the above conditions are not met.
+                        actions_to_remove.append(action_id)
+                        break
+
+                elif (((location_ii_floor == old_location_jj) and
+                       (old_location_ii == location_jj_floor)) or
+                      ((location_ii_ceil == old_location_jj) and
+                       (old_location_ii == location_jj_ceil)) or
+                      ((location_ii_floor == old_location_jj) and
+                       (old_location_ii == location_jj_ceil)) or
+                      ((location_ii_ceil == old_location_jj) and
+                       (old_location_ii == location_jj_floor))):
+                    # CROSSOVER COLLISION ! - NewLocations with OldLocations
+                    actions_to_remove.append(action_id)
+                    break
+
+
+        for action_id in actions_to_remove:
+            feasible_action_ids.remove(action_id)
+        actions_to_remove = []  # Clear actions_to_remove
+
+        # ..........................................#
+        return feasible_action_ids
 
 
 def LoadJsonScenario(json_filename='Scenarios.json', scenario_name='Base'):
