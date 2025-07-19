@@ -20,7 +20,7 @@ import Responsibility
 import Emergence
 import PlotGWorld
 
-import Plot_cFeAR as plotcf
+import Plot_cFeAR_ as plotcf
 
 plotgw = PlotGWorld.PlotGWorld();  # Object for accessing plotters
 import AnalysisOf_FeAR_Sims as FeARUI
