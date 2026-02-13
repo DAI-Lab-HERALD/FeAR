@@ -9,6 +9,7 @@ sns.set_theme(style="ticks")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.colors as mcolors
+import cmcrameri.cm as cmc
 
 import matplotlib.image as mpimg
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -20,6 +21,9 @@ from tqdm import tqdm
 import GWorld
 import Agent
 import Emergence
+from itertools import permutations
+
+
 
 VerboseFlag = False
 # VerboseFlag = True
@@ -32,10 +36,6 @@ CMAP_FeAR = sns.diverging_palette(220, 20, as_cmap=True)
 cmap_FeAR_normalize = mcolors.Normalize(vmin=-1, vmax=1)
 CMAP_FeAR_SCALAR_MAPPABLE = plt.cm.ScalarMappable(cmap=CMAP_FeAR, norm=cmap_FeAR_normalize)
 
-# Load your PNG image
-apple_image_path = 'star.png'  # Image courtesy : https://www.iconfinder.com/Tatyana.Kataykina
-apple_img = mpimg.imread(apple_image_path)
-
 # MOVE_ARROW_COLOUR = 'tab:blue'
 # MOVE_ARROW_COLOUR = 'tab:grey'
 MOVE_ARROW_COLOUR = 'dimgrey'
@@ -44,8 +44,8 @@ MOVE_ARROW_WIDTH = 0.05
 AGENT_BOX_OFFSET = 0.15
 
 # PRINT_MATRIX_SIZE = [9, 3]
-PRINT_MATRIX_SIZE = [1.5, 1.5]  # OG
-PRINT_MATRIX_SIZE_FINER = [2, 2]  # Finer
+PRINT_MATRIX_SIZE = [4, 4] # OG
+PRINT_MATRIX_SIZE_FINER = [6, 6]  # Finer
 
 # PRINT_GWORLD_SIZE = [8, 4]
 PRINT_GWORLD_SIZE = [12, 6]
@@ -74,7 +74,7 @@ class PlotGWorld:
 
     def __init__(self):
         #         #--- For Visualisation----
-        self.Gfig, self.Gax = plt.subplots();
+        self.Gfig, self.Gax = plt.subplots(figsize=(3, 3), dpi=FIG_DPI);
         # #         line, = self.Gax.plot([])     # A tuple unpacking to unpack the only plot
         # plt.clf();
         # plt.axis('equal');
@@ -83,9 +83,13 @@ class PlotGWorld:
     # ----------------------------------------------------------------------------------------------- #
 
     def ViewGWorld(self, World, ViewNextStep=False, ViewActionTrail=True, ViewActionArrows=True, Animate=False, ax=None,
-                   saveFolder=None, imageName='GW_Snap', mark_agent_entropy=True,
-                   annot_font_size=6, overwrite_image=False, colour_by_fear=False, fear_values=None,
-                   mdr_colour=False, game_mode=False, ego_id=0, apples=[]):
+                   saveFolder=None, imageName='GW_Snap', extension='png',
+                   mark_agent_entropy=True,
+                   highlight_actor=None, highlight_affected=None, highlight_affected_action=False,
+                   grayscale=False,
+                   annot_font_size=GWORLD_FONT_SIZE, overwrite_image=False, colour_by_fear=False, fear_values=None,
+                   mdr_colour=False, game_mode=False, ego_id=0, apples=[],
+                   annot_rox=None):
 
         if ViewActionTrail:
             WorldState = World.WorldState
@@ -111,21 +115,19 @@ class PlotGWorld:
         mask = np.where(WorldState >= 0, 0, np.nan)
         mask_c = np.where(mask == 0, 1, 0)
 
-        # plt.clf()
-        if ax is not None:
-            ax.clear()
-
+        plt.clf()
         len_x, len_y = WorldState.shape
         axis_length_max = max(len_x, len_y)
 
         # Plot Agent IDs and Locations of the Map
+
         # Plotting Grey blocks for valid regions of the Map
-        cmap_for_grey = cmap = sns.color_palette("Greys", as_cmap=True)
+        cmap_for_grey = sns.color_palette("Greys", as_cmap=True)
         ax = sns.heatmap(np.zeros_like(WorldState), linewidths=max(25 // axis_length_max, 3), square=True, mask=mask,
-                         linecolor='whitesmoke', ax=ax,
-                         cbar=False, cmap=cmap_for_grey, vmax=10, vmin=-3)
+                         linecolor='whitesmoke',
+                         cbar=False, cmap=cmap_for_grey, vmax=10, vmin=-1.5)
         ax = sns.heatmap(np.zeros_like(WorldState), linewidths=max(25 // axis_length_max, 3) - 2, square=True,
-                         mask=mask_c, ax=ax,
+                         mask=mask_c,
                          cbar=False, cmap=cmap_for_grey, vmax=10, vmin=0)
         # Plotting Agent Locations with Annotations
         # ax = sns.heatmap(map_values, linewidths=1, annot=Annotations, mask=mask,
@@ -133,8 +135,7 @@ class PlotGWorld:
         #                  cbar=False, cmap=ColourPalette, annot_kws={"size": annot_font_size})
         # plt.title('State of GWorld: ')
         # plt.axis('equal')
-        # plt.axis('off')
-        ax.set_axis_off()
+        plt.axis('off')
         xlim_heatmap = ax.get_xlim()
         ylim_heatmap = ax.get_ylim()
 
@@ -145,7 +146,9 @@ class PlotGWorld:
             else:
                 print('Number of FeAR values passed in does not match the number of agents.')
         else:
-            agent_colours = special_spectral_cmap(n_colours=len(World.AgentList), game_mode=game_mode, ego_id=ego_id)
+            agent_colours = special_spectral_cmap(n_colours=len(World.AgentList), game_mode=game_mode, ego_id=ego_id,
+                                                  highlight_actor=highlight_actor, highlight_affected=highlight_affected,
+                                                  grayscale=grayscale)
 
         for xx in range(len_x):
             for yy in range(len_y):
@@ -160,25 +163,27 @@ class PlotGWorld:
                     # ax = plot_rect_on_matrix(yy, xx, ax=ax, offset=-AGENT_BOX_OFFSET, color=MOVE_ARROW_COLOUR,
                     #                          linewidth=3)
 
+                    if highlight_actor is not None or highlight_affected is not None:
+                        if agentIdxxyy in highlight_affected:
+                            edgecolor=MOVE_ARROW_COLOUR
+                        elif agentIdxxyy in highlight_actor:
+                            edgecolor=MOVE_ARROW_COLOUR
+                        else:
+                            edgecolor= 'darkgrey'
+                    else:
+                        edgecolor = MOVE_ARROW_COLOUR
+
                     ax = plot_rect_on_matrix(yy, xx, ax=ax, offset=-AGENT_BOX_OFFSET,
                                              linewidth=max(20 // axis_length_max, 1),
-                                             color=agent_colours[agentIdxxyy], fill=True, zorder=5)
-                    ax.text(yy + 0.5, xx + 0.5, agent_annotation, zorder=6, size=GWORLD_FONT_SIZE,
+                                             color=agent_colours[agentIdxxyy],
+                                             edgecolor=edgecolor,
+                                             fill=True, zorder=5)
+                    ax.text(yy + 0.5, xx + 0.5, agent_annotation, zorder=10, size=annot_font_size,
                             horizontalalignment='center', verticalalignment='center_baseline')
         for apple in apples:
-            # ax.text(apple[1] + 0.5, apple[0] + 0.5, '$\U0001F604$', zorder=5, size=GWORLD_FONT_SIZE,
-            #         horizontalalignment='center', verticalalignment='center_baseline', color='red')
+            ax.text(apple[1] + 0.5, apple[0] + 0.5, '$\U0001F604$', zorder=5, size=annot_font_size,
+                    horizontalalignment='center', verticalalignment='center_baseline', color='red')
 
-            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=15, color='goldenrod')
-            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=12, color='#FAC205')
-            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=10, color='gold')
-
-            # ax.plot(apple[1] + 0.5, apple[0] + 0.5, marker='*', markersize=15, color='gold', mec='#FAC205')
-
-            x, y = apple
-            imagebox = OffsetImage(apple_img, zoom=0.3)  # Adjust zoom to change the size of the image
-            ab = AnnotationBbox(imagebox, (y + 0.5, x + 0.5), frameon=False)
-            ax.add_artist(ab)
 
         MaxSteps = World.MaxSteps
         # MaX_ArrowOffsets = np.ceil(MaxSteps/5)*5 # So as to get a multiple of 5
@@ -237,11 +242,24 @@ class PlotGWorld:
                 y = y0 + ArrowOffset_y
 
                 if not mdr_colour:
-                    ax.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR, zorder=4,
+                    if highlight_actor is None and highlight_affected is None:
+                        arrow_colour = MOVE_ARROW_COLOUR
+                    else: # Use lighter arrows for non-highlighted agents
+                        if idx in highlight_actor:
+                            arrow_colour = MOVE_ARROW_COLOUR
+                        elif idx in highlight_affected:
+                            if highlight_affected_action:
+                                arrow_colour=MOVE_ARROW_COLOUR
+                            else:
+                                arrow_colour='darkgrey'
+                        else:
+                            arrow_colour = 'darkgray'
+
+                    plt.arrow(y, x, dy, dx, ls='-', color=arrow_colour, zorder=4,
                               width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
                               length_includes_head=True)
                 else:
-                    ax.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR_MDR, zorder=4,
+                    plt.arrow(y, x, dy, dx, ls='-', color=MOVE_ARROW_COLOUR_MDR, zorder=4,
                               width=MOVE_ARROW_WIDTH, head_width=MOVE_ARROW_WIDTH * 3,
                               length_includes_head=True)
 
@@ -264,7 +282,7 @@ class PlotGWorld:
                 x = path[0][0] + ArrowOffset
                 y = path[0][1] + ArrowOffset + Margin_OneWayArrow * np.sign(dy)  # Add Margin
 
-            ax.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
+            plt.arrow(y, x, dy, dx, ls='-', color='gold', width=.08,
                       lw=0.5, length_includes_head=True)
 
         # Plot Walls
@@ -285,7 +303,41 @@ class PlotGWorld:
                 dx = 0
                 dy = 1
 
-            ax.plot([y, y + dy], [x, x + dx], ls='-', color='tab:red', linewidth=2)
+            plt.plot([y, y + dy], [x, x + dx], ls='-', color='tab:red', linewidth=2)
+
+
+        if annot_rox:
+
+            if 'rects' in annot_rox.keys():
+                rects = annot_rox['rects']
+                for rect_color in rects.keys():
+                    xx_s= rects[rect_color]['x_s']
+                    yy_s= rects[rect_color]['y_s']
+
+                    for xx,yy in zip(xx_s, yy_s):
+                        plot_rect_on_matrix(xx, yy, ax=ax, color=rect_color,
+                                            zorder=6, offset=-0.02, linewidth=2)
+
+            if 'circs' in annot_rox.keys():
+                circs = annot_rox['circs']
+                for circ_color in circs.keys():
+                    xx_s = circs[circ_color]['x_s']
+                    yy_s = circs[circ_color]['y_s']
+
+                    for xx, yy in zip(xx_s, yy_s):
+                        plot_circ_on_matrix(xx, yy, ax=ax, color='white',linewidth=7, zorder=6, offset=-0.2)
+                        plot_circ_on_matrix(xx, yy, ax=ax, color=circ_color, zorder=6, offset=-0.2)
+
+            if 'crosses' in annot_rox.keys():
+                crosses = annot_rox['crosses']
+                for cross_color in crosses.keys():
+                    xx_s = crosses[cross_color]['x_s']
+                    yy_s = crosses[cross_color]['y_s']
+
+                    for xx, yy in zip(xx_s, yy_s):
+                        plot_xcross_on_matrix(xx, yy, ax=ax, color=cross_color, zorder=6,
+                                              offset=-0.3, linewidth=7)
+
 
         #         # Plot Restricted Paths
         #         for path in self.RestrictedPaths:
@@ -298,20 +350,19 @@ class PlotGWorld:
         ax.set_ylim(ylim_heatmap)
         ax.set_xlim(xlim_heatmap)
 
-        # fig = plt.gcf()
-        fig = ax.get_figure()
+        fig = plt.gcf()
 
         if saveFolder is not None:
             fig.set_size_inches(PRINT_GWORLD_SIZE[0], PRINT_GWORLD_SIZE[1])
             fig.set_dpi(PRINT_DPI)
-            ax.set_title('')
+            plt.title('')
 
-            save_plot(imageName, overwrite_image, saveFolder)
+            save_plot(imageName, overwrite_image, saveFolder, extension=extension)
         else:
             fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         if not Animate:
-            fig.show()
+            plt.show()
 
         return ax
 
@@ -360,8 +411,9 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, title='Responsibility',
                        plot_feal_separately=False, saveFolder=None, imageName='FeAR_', fmt=DECIMALS_FMT,
                        skip_title=False, skip_xlabel=False, add_hatches=True, gray_feal=True,
+                       exclude_diag=True, extension='pdf',
                        overwrite_image=False, for_print=False, finer=False):
-    maskDiag, ticklabels = get_mask_n_ticks(Resp)
+    maskDiag, ticklabels = get_mask_n_ticks(Resp, ExcludeDiag=exclude_diag)
     xlabel = 'Actor'
     ylabel = 'Affected'
 
@@ -393,10 +445,10 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, t
         ax = fear_axs[0]
 
     else:
-
-        ax = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title=title, xticklabels=ticklabels,
-                        yticklabels=ticklabels, for_print=for_print, fmt=fmt,
-                        mask=maskDiag, ax=ax, annot_font_size=annot_font_size, cbar=cbar);
+        if ax is not None:
+            ax = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title=title, xticklabels=ticklabels,
+                            yticklabels=ticklabels, for_print=for_print, fmt=fmt,
+                            mask=maskDiag, ax=ax, annot_font_size=annot_font_size, cbar=cbar);
 
         if FeAL is not None:
             N_Agents = len(FeAL)
@@ -443,28 +495,34 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, t
                         plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, edgecolor='white', lw=1))
 
     if for_print:
-        fig = plt.gcf()
+        # fig = plt.gcf()
+        fig = ax.figure
         if finer:
             fig.set_size_inches(PRINT_MATRIX_SIZE_FINER[0], PRINT_MATRIX_SIZE_FINER[1])
         else:
             fig.set_size_inches(PRINT_MATRIX_SIZE[0], PRINT_MATRIX_SIZE[1])
         fig.set_dpi(PRINT_DPI)
 
-        save_plot(imageName, overwrite_image, saveFolder)
+        save_plot(imageName, overwrite_image, saveFolder, ax=ax, extension=extension)
 
     return ax
 
 
-def save_plot(imageName, overwrite_image, saveFolder, extension='png'):
+def save_plot(imageName, overwrite_image, saveFolder, extension='png', ax=None):
+    if ax:
+        fig = ax.figure
+    else:
+        fig = plt.gcf()
+
     if saveFolder is not None:
         filepath = os.path.join(saveFolder, imageName)
         if not overwrite_image:
             i = 0
             while os.path.exists(('{}{:03d}.' + extension).format(filepath, i)):
                 i += 1
-            plt.savefig(('{}{:03d}.' + extension).format(filepath, i))
+            fig.savefig(('{}{:03d}.' + extension).format(filepath, i))
         else:
-            plt.savefig(filepath + '.' + extension)
+            fig.savefig(filepath + '.' + extension)
 
     # To remove the size and dpi settings for the next plot
     # fig, ax = plt.subplots()
@@ -625,7 +683,7 @@ def plot_valid_actions(validity_of_actions=None, ax=None, title=None, only_horiz
 
 
 def plot_rect_on_matrix(x, y, ax=None, offset=0.05, color='gainsboro', linewidth=3, zorder=1, fill=False,
-                        x_len=1, y_len=1):
+                        x_len=1, y_len=1, edgecolor=MOVE_ARROW_COLOUR):
     if ax is None:
         print('No Axis Passed!')
         return False
@@ -637,12 +695,41 @@ def plot_rect_on_matrix(x, y, ax=None, offset=0.05, color='gainsboro', linewidth
     else:  # Using patches for fill
         rect = patches.Rectangle((x - offset, y - offset), (1 + 2 * offset), (1 + 2 * offset), zorder=zorder,
                                  linewidth=linewidth,
-                                 edgecolor=MOVE_ARROW_COLOUR, facecolor=color)
+                                 edgecolor=edgecolor, facecolor=color)
         ax.add_patch(rect)
 
     return ax
 
 
+def plot_circ_on_matrix(x, y, r=0.5, ax=None, offset=0.05,
+                        color='gainsboro', linewidth=5, zorder=1,
+                        fill=False,
+                        ):
+    if ax is None:
+        print('No Axis Passed!')
+        return False
+    circle = plt.Circle((x+0.5, y+0.5), r+offset, color=color, linewidth=linewidth,fill=fill, zorder=zorder)
+    ax.add_patch(circle)
+    return ax
+
+
+def plot_xcross_on_matrix(x, y, ax=None, offset=0.05,
+                        color='gainsboro', linewidth=7, zorder=1,
+                        x_len=1, y_len=1,
+                        ):
+    if ax is None:
+        print('No Axis Passed!')
+        return False
+    ax.plot([x - offset,  x + x_len + offset],
+            [y - offset,  y + y_len + offset], color=color,
+            linewidth=linewidth,
+            zorder=zorder)
+    ax.plot([x + x_len + offset, x - offset],
+            [y - offset, y + y_len + offset], color=color,
+            linewidth=linewidth,
+            zorder=zorder)
+
+    return ax
 # -------------------------------------------------------------------------------------------------------------------#
 
 
@@ -654,7 +741,21 @@ def make_gif_from_folder(folder, GifName='_NewGif', duration=500):
     return None
 
 
-def special_spectral_cmap(n_colours=5, game_mode=False, ego_id=0):
+def special_spectral_cmap(n_colours=5, game_mode=False, ego_id=0,
+                          highlight_affected=None, highlight_actor=None,
+                          grayscale=False):
+    if highlight_actor or highlight_affected:
+        colours = ['lightgray' for i in range(n_colours)]
+        for i in highlight_actor:
+            colours[i] = (0.9155324875048059, 0.6192233756247598, 0.65440215301807)
+        for j in highlight_affected:
+            colours[j] = (0.5820686065676477, 0.7683811347467602, 0.8872124391839864)
+
+        return colours
+
+    if grayscale and not game_mode:
+        return ['lightgray' for i in range(n_colours)]
+
     if game_mode:
         ego_colour = (0.5820686065676477, 0.7683811347467602, 0.8872124391839864)
         others_colour = (0.996078431372549, 0.8784313725490196, 0.5450980392156862)
@@ -669,17 +770,6 @@ def special_spectral_cmap(n_colours=5, game_mode=False, ego_id=0):
     # Function to get the set of spectral colours I like
     if n_colours >= 5:
         return sns.color_palette("Spectral", n_colors=n_colours)
-    # elif n_colours == 5:
-    #     # return [(0.8310649750096117, 0.23844675124951936, 0.30880430603613995),
-    #     #         (0.9568627450980393, 0.42745098039215684, 0.2627450980392157),
-    #     #         (0.996078431372549, 0.8784313725490196, 0.5450980392156862),
-    #     #         (0.6652825836216842, 0.8645905420991927, 0.6432141484044599),
-    #     #         (0.19946174548250672, 0.5289504036908881, 0.7391003460207612)]
-    #     return [(0.8817454825067284, 0.4669127258746635, 0.5161630142252978),
-    #             (0.9698039215686275, 0.5992156862745097, 0.48392156862745106),
-    #             (0.9972549019607844, 0.9149019607843136, 0.6815686274509802),
-    #             (0.7656978085351791, 0.9052133794694348, 0.7502499038831221),
-    #             (0.4148960491947068, 0.6757335886454643, 0.8420974148575809)]
     elif n_colours == 4:
         colours = sns.color_palette("Spectral", n_colors=9)
         return [(0.9155324875048059, 0.6192233756247598, 0.65440215301807),
@@ -701,3 +791,223 @@ def special_spectral_cmap(n_colours=5, game_mode=False, ego_id=0):
         colours = sns.color_palette("Spectral", n_colors=9)
         return [(0.9155324875048059, 0.6192233756247598, 0.65440215301807)]
         # return colours[0]
+
+
+def plotGroup(i, n, resp, overwrite_image=False, for_print=False,
+              saveFolder=None, scenario_name=' ', fmt='0.2f', cbar=False,
+              annot_font_size = 12, actors_on_x=True,
+              add_hatches=True):
+
+    cmap = sns.diverging_palette(220, 20, as_cmap=True, sep=1)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=-1, vmax=1))
+
+    if actors_on_x:
+        resp = resp.T
+        y_values = np.arange(1, n + 1)
+        x_values = [perm for perm in permutations(y_values, i) if sorted(perm) == list(perm)]
+    else:
+        x_values = np.arange(1, n + 1)
+        y_values = [perm for perm in permutations(x_values, i) if sorted(perm) == list(perm)]
+
+
+    _, ax = plt.subplots(figsize=(max(len(x_values),2), max(len(y_values)/2,1.7)))
+
+    sns.heatmap(resp.T, ax=ax, cmap=cmap, center=0, vmin=-1, vmax=1, linecolor='white', linewidths=1, cbar=cbar,
+                annot=True, annot_kws={"size": annot_font_size},
+                fmt=fmt)
+
+    if actors_on_x:
+        y_labels = y_values
+        x_labels = [
+            '{'+ ','.join(
+                [ str(x_values[ix][ia]) for ia in range(len(x_values[ix])) ]
+            ) + '}' for ix in range(len(x_values))
+                   ]
+    else:
+        x_labels = x_values
+        y_labels = [
+            '{' + ','.join(
+                [str(y_values[iy][ia]) for ia in range(len(y_values[iy]))]
+            ) + '}' for iy in range(len(y_values))
+        ]
+    ax.set_xticks(ticks=np.arange(len(x_values)) + 0.5, labels=x_labels)
+    ax.set_yticks(ticks=np.arange(len(y_values)) + 0.5, labels=y_labels, rotation=0)
+
+    if actors_on_x:
+        ax.set_xlabel("Actors")
+        ax.set_ylabel("Affected")
+        ax.invert_yaxis()
+    else:
+        ax.set_ylabel("Actors")
+        ax.set_xlabel("Affected")
+    ax.set_title(f'{i}-Agent Group FeAR')
+
+    if add_hatches:
+
+        # Overlay hatching for negative and positive values
+        tt = 0.000
+        # c_del = 0.95
+        c_del = 0.3
+        for ii in range(resp.shape[1]):
+            for jj in range(resp.shape[0]):
+
+                if resp[jj, ii] < 0:
+                    ax.add_patch(plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, hatch='....',
+                                               edgecolor=sm.to_rgba(-c_del), lw=0))
+                    ax.add_patch(
+                        plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, edgecolor='white', lw=1))
+
+                elif resp[jj,ii] > 0:
+                    ax.add_patch(plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, hatch='//',
+                                               edgecolor=sm.to_rgba(1 - c_del), lw=0))
+                    ax.add_patch(
+                        plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, edgecolor='white', lw=1))
+
+    if for_print:
+        save_plot(imageName=f'{scenario_name}_{i}-gFeAR', overwrite_image=overwrite_image, saveFolder=saveFolder)
+
+
+    plt.show()
+
+
+def plot_scenario(scenario_name=None, scenario_source_file='Scenarios4FeARSims.json',
+                  save_folder='GW_Snaps',  extension='pdf', annot_font_size=24, random_seed=0,):
+    assert scenario_name is not None, 'scenario_name must be provided'
+    rng = np.random.default_rng(seed=random_seed)
+    plotgw = PlotGWorld()
+
+    Scenario = GWorld.LoadJsonScenario(json_filename=scenario_source_file, scenario_name=scenario_name)
+
+    # GWorld Preview
+
+    Region = np.array(Scenario['Map']['Region'])
+    Walls = Scenario['Map']['Walls']
+    OneWays = Scenario['Map']['OneWays']
+
+    World = GWorld.GWorld(Region, Walls=Walls, OneWays=OneWays)  # Initialising GWorld from Scenario
+
+    N_Agents = Scenario['N_Agents']
+
+    AgentLocations = []
+    for location in Scenario['AgentLocations']:
+        AgentLocations.append(tuple(location))
+
+    # Adding N Agents at sortedandom positions
+    if len(AgentLocations) < N_Agents:
+        [locX, locY] = np.where(Region == 1)
+
+        LocIdxs = rng.choice(locX.shape[0], size=(N_Agents - len(AgentLocations)), replace=False, shuffle=False)
+        LocIdxs.sort()
+
+        for Idx in LocIdxs:
+            AgentLocations.append((locX[Idx], locY[Idx]))
+
+    # Adding Agents
+    PreviousAgentAdded = True
+    for location in AgentLocations:
+        # Adding new Agents if Previous Agent was Added to the World
+        if PreviousAgentAdded:
+            Ag_i = Agent.Agent()
+        PreviousAgentAdded = World.AddAgent(Ag_i, location, printStatus=False)
+
+    PreviousAgentAdded = True
+    while len(World.AgentList) < N_Agents:
+        # Adding new Agents if Previous Agent was Added to the World
+        if PreviousAgentAdded:
+            Ag_i = Agent.Agent()
+        Loc_i = (np.random.randint(Region.shape[0]), np.random.randint(Region.shape[1]))
+        PreviousAgentAdded = World.AddAgent(Ag_i, Loc_i, printStatus=False)
+
+    # -------------------------------------------------------------------------------
+    # Selecting actions for agents
+    # -------------------------------------------------------------------------------
+
+    defaultAction = Scenario['defaultAction']
+    SpecificAction4Agents = Scenario['SpecificAction4Agents']
+
+    # Setting Policy for all Agents
+
+    # The default Step and Direction Weights
+    StepWeights = Scenario['StepWeights']
+    DirectionWeights = Scenario['DirectionWeights']
+
+    ListOfStepWeights = []
+    ListOfDirectionWeights = []
+
+    for ii in range(len(World.AgentList)):
+        ListOfStepWeights.append(StepWeights)
+        ListOfDirectionWeights.append(DirectionWeights)
+
+    # Updating the list of stepweights based on specific weights for agents
+    for agentIDs, stepweights4agents in Scenario['SpecificStepWeights4Agents']:
+        for agentID in agentIDs:
+            ListOfStepWeights[agentID] = stepweights4agents
+
+    # Updating the list of directionweights based on specific weights for agents
+    for agentIDs, directionweights4agents in Scenario['SpecificDirectionWeights4Agents']:
+        for agentID in agentIDs:
+            ListOfDirectionWeights[agentID] = directionweights4agents
+
+        # Updating Agent Policies in World
+        for ii, agent in enumerate(World.AgentList):
+            policy = Agent.GeneratePolicy(StepWeights=ListOfStepWeights[ii],
+                                          DirectionWeights=ListOfDirectionWeights[ii])
+            agent.UpdateActionPolicy(policy)
+
+    if 'Policies' in (Scenario.keys()):
+        # Dictionary of Policies
+        if Scenario['Policies']:
+            policies = Scenario['Policies']
+            policy_map = np.zeros(np.shape(Region), dtype=int)
+
+            policy_keys = Scenario['Policies'].keys()
+            # print(f'{policy_keys =}')
+            for key in policy_keys:
+                slicex = Scenario['Policies'][key]['slicex']
+                slicey = Scenario['Policies'][key]['slicey']
+                policy_map[slicex, slicey] = key
+
+            # print(f'Region =\n {Region}')
+            print(f'policyMap =\n {policy_map}')
+
+            # Setting Policy for all Agents
+
+            # Updating Agent Policies in World
+            for ii, agent in enumerate(World.AgentList):
+                agent_location = World.AgentLocations[ii]
+                agent_policy = str(policy_map[agent_location[0], agent_location[1]]).zfill(2)
+                if 'policyWeights' in policies[agent_policy].keys():
+                    policy_weights = policies[agent_policy]['policyWeights']
+                    agent_stepWeights = None
+                    agent_directionWeights = None
+                else:
+                    policy_weights = None
+                    agent_stepWeights = policies[agent_policy]['stepWeights']
+                    agent_directionWeights = policies[agent_policy]['directionWeights']
+
+                policy = Agent.GeneratePolicy(StepWeights=agent_stepWeights, DirectionWeights=agent_directionWeights,
+                                              policy_weights=policy_weights)
+                agent.UpdateActionPolicy(policy)
+
+    Action4Agents = World.SelectActionsForAll(defaultAction=defaultAction, InputActionID4Agents=SpecificAction4Agents)
+
+    # Plotting the State of the World and Chosen Actions for the next iteration
+    ax = plotgw.ViewGWorld(World, ViewActionArrows=True, ViewNextStep=True, ViewActionTrail=False,
+                           saveFolder=save_folder,
+                           imageName=f'{scenario_name}_scenario', extension=extension,
+                           annot_font_size=annot_font_size,
+                           overwrite_image=True)
+
+
+
+def make_axes_gray(ax):
+
+    fig = ax.get_figure()
+
+    for ax in fig.axes:
+        plt.setp(ax.spines.values(), color='lightgray')
+        ax.tick_params(labelcolor='dimgray', colors='lightgray')
+
+        ax.xaxis.label.set_color('dimgray')
+        ax.yaxis.label.set_color('dimgray')
+
