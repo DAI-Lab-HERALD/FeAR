@@ -65,8 +65,6 @@ plt.rcParams['figure.figsize'] = FIG_SIZE
 plt.rcParams['figure.dpi'] = FIG_DPI
 
 plt.rcParams['savefig.bbox'] = 'tight'
-
-
 # plt.rcParams['savefig.pad_inches'] = 0.1 // Default = 0.1
 
 
@@ -84,6 +82,7 @@ class PlotGWorld:
 
     def ViewGWorld(self, World, ViewNextStep=False, ViewActionTrail=True, ViewActionArrows=True, Animate=False, ax=None,
                    saveFolder=None, imageName='GW_Snap', extension='png',
+                   title=None,
                    mark_agent_entropy=True,
                    highlight_actor=None, highlight_affected=None, highlight_affected_action=False,
                    grayscale=False,
@@ -352,10 +351,15 @@ class PlotGWorld:
 
         fig = plt.gcf()
 
+
         if saveFolder is not None:
             fig.set_size_inches(PRINT_GWORLD_SIZE[0], PRINT_GWORLD_SIZE[1])
             fig.set_dpi(PRINT_DPI)
-            plt.title('')
+
+            if title is not None:
+                plt.title(title, fontsize=annot_font_size)
+            else:
+                plt.title('')
 
             save_plot(imageName, overwrite_image, saveFolder, extension=extension)
         else:
@@ -372,7 +376,7 @@ class PlotGWorld:
 def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor='white',
                xticklabels='auto', yticklabels='auto', ax=None, annot=True,
                vmin=-1, vmax=1, center=0, title=None, cbar=None, annot_colour=None,
-               annot_font_size=5, fmt=DECIMALS_FMT, for_print=False):
+               annot_font_size=5, fmt=DECIMALS_FMT, for_print=False, square=True):
     if cmap is None:
         cmap = sns.diverging_palette(220, 20, as_cmap=True, sep=1)
 
@@ -384,8 +388,8 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 
         if cbar is None:
             cbar = False
-    else:
-        square = True
+    # else:
+    #     square = True
 
     if annot_colour:
         annot_kws = {"size": annot_font_size,
@@ -411,8 +415,8 @@ def plotMatrix(Matrix, xlabel=None, ylabel=None, cmap=None, mask=None, linecolor
 def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, title='Responsibility',
                        plot_feal_separately=False, saveFolder=None, imageName='FeAR_', fmt=DECIMALS_FMT,
                        skip_title=False, skip_xlabel=False, add_hatches=True, gray_feal=True,
-                       exclude_diag=True, extension='pdf',
-                       overwrite_image=False, for_print=False, finer=False):
+                       exclude_diag=True, extension='pdf', save_file=False,
+                       overwrite_image=False, for_print=False, finer=False, square=True):
     maskDiag, ticklabels = get_mask_n_ticks(Resp, ExcludeDiag=exclude_diag)
     xlabel = 'Actor'
     ylabel = 'Affected'
@@ -435,20 +439,19 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, t
         fig, fear_axs = plt.subplots(1, 2, sharey=True, gridspec_kw={'width_ratios': [len(FeAL) + 1, 1]})
 
         fear_axs[0] = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title='FeAR', xticklabels=ticklabels,
-                                 yticklabels=ticklabels, for_print=for_print, fmt=fmt,
+                                 yticklabels=ticklabels, for_print=for_print, square=square, fmt=fmt,
                                  mask=maskDiag, ax=fear_axs[0], annot_font_size=annot_font_size, cbar=cbar)
         fear_axs[1] = plotMatrix(np.array([FeAL]), xlabel=None, ylabel=ylabel, title='FeAL',
-                                 yticklabels=ticklabels, for_print=for_print, fmt=fmt,
+                                 yticklabels=ticklabels, for_print=for_print, square=square, fmt=fmt,
                                  ax=fear_axs[1], annot_font_size=annot_font_size, cbar=False)
 
         fig.suptitle(title)
         ax = fear_axs[0]
 
     else:
-        if ax is not None:
-            ax = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title=title, xticklabels=ticklabels,
-                            yticklabels=ticklabels, for_print=for_print, fmt=fmt,
-                            mask=maskDiag, ax=ax, annot_font_size=annot_font_size, cbar=cbar);
+        ax = plotMatrix(Resp, xlabel=xlabel, ylabel=ylabel, title=title, xticklabels=ticklabels,
+                        yticklabels=ticklabels, for_print=for_print, square=square, fmt=fmt,
+                        mask=maskDiag, ax=ax, annot_font_size=annot_font_size, cbar=cbar);
 
         if FeAL is not None:
             N_Agents = len(FeAL)
@@ -460,7 +463,7 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, t
             ax = plotMatrix(FeAL_matrix, mask=mask_feal, xlabel=xlabel, ylabel=ylabel, title=title, vmin=0, fmt=fmt,
                             xticklabels=ticklabels, yticklabels=ticklabels, ax=ax,
                             annot_font_size=annot_font_size, annot_colour='black',
-                            cbar=False, for_print=for_print);
+                            cbar=False, for_print=for_print, square=square);
 
             for xx in range(N_Agents):
                 # ax = plot_rect_on_matrix(xx, xx, ax=ax, offset=-0.08, color=sm.to_rgba(0), linewidth=0,
@@ -495,14 +498,16 @@ def plotResponsibility(Resp, FeAL=None, ax=None, cbar=None, annot_font_size=8, t
                         plt.Rectangle((jj + tt / 2, ii + tt / 2), 1 - tt, 1 - tt, fill=False, edgecolor='white', lw=1))
 
     if for_print:
+        save_file=True
         # fig = plt.gcf()
         fig = ax.figure
         if finer:
             fig.set_size_inches(PRINT_MATRIX_SIZE_FINER[0], PRINT_MATRIX_SIZE_FINER[1])
         else:
             fig.set_size_inches(PRINT_MATRIX_SIZE[0], PRINT_MATRIX_SIZE[1])
-        fig.set_dpi(PRINT_DPI)
+            fig.set_dpi(PRINT_DPI)
 
+    if save_file:
         save_plot(imageName, overwrite_image, saveFolder, ax=ax, extension=extension)
 
     return ax
@@ -871,7 +876,7 @@ def plotGroup(i, n, resp, overwrite_image=False, for_print=False,
 
 
 def plot_scenario(scenario_name=None, scenario_source_file='Scenarios4FeARSims.json',
-                  save_folder='GW_Snaps',  extension='pdf', annot_font_size=24, random_seed=0,):
+                  save_folder='Plots',  extension='pdf', annot_font_size=24, random_seed=0,):
     assert scenario_name is not None, 'scenario_name must be provided'
     rng = np.random.default_rng(seed=random_seed)
     plotgw = PlotGWorld()

@@ -112,6 +112,9 @@ acs-*.bib
 # TODO Comment the next line if you want to keep your tikz graphics files
 *.tikz
 *-tikzDictionary
+*.tex
+
+*.pkl
 
 # listings
 *.lol
@@ -232,8 +235,6 @@ TSWLatexianTemp*
 **/.idea/**
 
 **/__pycache__/**
+**.ipynb_checkpoints/**
 
 **/Results/**
-
-**/.ipynb_checkpoints/**
-

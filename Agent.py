@@ -15,7 +15,23 @@ class Agent:
         self.SelectedActionName = None
 
         self.ActionPolicy = None
-        self.SensorStates = None
+        # self.SensorStates = None
+
+    def __eq__(self, other):
+        if not isinstance(other, Agent):
+            return NotImplemented
+        return (
+                self.Actions == other.Actions and
+                self.SelectedAction == other.SelectedAction and
+                np.array_equal(self.ActionPolicy,other.ActionPolicy)
+                )
+
+    def __hash__(self):
+        return hash((
+            tuple(tuple(action) for action in self.Actions),  # Convert each inner list to tuple
+            tuple(self.SelectedAction),
+            self.ActionPolicy.tobytes()
+        ))
 
     def UpdateActionPolicy(self, NewPolicy):
         if len(NewPolicy) == len(self.Actions):
@@ -178,19 +194,38 @@ def DefineActions():
     return ActionNames, ActionMoves
 
 
-def GeneratePolicy(StepWeights = None, DirectionWeights=None):
-    if StepWeights is None:
-        StepWeights = [5, 4, 3, 2, 1]
-    if DirectionWeights is None:
-        DirectionWeights = [1, 1, 1, 1]
+def GeneratePolicy(StepWeights = None, DirectionWeights=None, policy_weights=None):
+    """
+    Function to get normalised policy weights for selecting actions
 
-    p = [StepWeights[0]]  # Only one action has 0 steps - 'Stay'
-    for sw in StepWeights[1:]:
-        # Multiply stepweight with directionweight
-        p = p + [sw * x for x in DirectionWeights]
+    :param StepWeights: list
+    :param DirectionWeights: list
+    :param policy_weights: list of lists
+    :return: Policy
+    """
+    # If policy weights are given, use them directly
+    if policy_weights:
+        p = []
+        for p_w in policy_weights:
+            p = p + p_w
+
+    # Use step weights and direction weights otherwise
+    else:
+        if StepWeights is None:
+            StepWeights = [5, 4, 3, 2, 1]
+        if DirectionWeights is None:
+            DirectionWeights = [1, 1, 1, 1]
+
+        p = [StepWeights[0] * 4]  # Only one action has 0 steps - 'Stay'
+        # The factor of four is because other actions have 4 directions
+
+        for sw in StepWeights[1:]:
+            # Multiply stepweight with directionweight
+            p = p + [sw * x for x in DirectionWeights]
 
     p = np.array(p)  # Converting to numpy array
-    p = p / p.sum()  # Normalising so that sum of probabilities is 1
+    if p.sum() != 0:
+        p = p / p.sum()  # Normalising so that sum of probabilities is 1
 
     if VerboseFlag: print('P : ', p, 'Sum: ', p.sum())
 
