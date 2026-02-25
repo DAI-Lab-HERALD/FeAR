@@ -6,6 +6,8 @@ Github repository for the publication : https://ebooks.iospress.nl/volumearticle
 
 The paper proposes a metric (FeAR) for causal responsibility in multi-agent spatial interactions. The FeAR metric was implemented in a grid world simulation that was created to model multi-agent spatial interactions.
 
+*(For **group FeAR** go to : https://github.com/DAI-Lab-HERALD/FeAR/blob/main/README_GroupFeAR.md)* 
+
 ---
 ![Grid world snapshot](Plots/GWorldSnapshot.png)
 
