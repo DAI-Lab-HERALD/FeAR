@@ -722,10 +722,9 @@ def get_pygame_surf_from_ax(ax):
     fig = ax.get_figure()
     canvas = agg.FigureCanvasAgg(fig)
     canvas.draw()
-    renderer = canvas.get_renderer()
-    raw_data = renderer.tostring_rgb()
+    raw_data = canvas.buffer_rgba()
     size = canvas.get_width_height()
-    surf = pygame.image.fromstring(raw_data, size, "RGB")
+    surf = pygame.image.frombuffer(raw_data, size, "RGBA")
     return surf
 
 

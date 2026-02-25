@@ -57,7 +57,7 @@ pygame.display.set_icon(pygame_icon)
 pygame.display.set_caption('Game of FeAR   :   Feasible Action-Space Reduction')
 
 # GAME_FONT = pygame.font.Font('DragonHunter.otf', 30, bold=False)
-GAME_FONT = pygame.font.Font('Jaro_36pt-Regular.ttf', 30, bold=False)
+GAME_FONT = pygame.font.Font('Jaro_36pt-Regular.ttf', 30)
 
 # DISPLAY_FONT = pygame.font.Font('LinLibertine_RB.ttf', 20, bold=True)
 # DISPLAY_FONT = pygame.font.Font('DragonHunter.otf', 20, bold=False)
